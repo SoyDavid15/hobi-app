@@ -1,5 +1,5 @@
 import { ThemedView } from "@/components/themed-view";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -9,14 +9,24 @@ import {
   Text,
   View,
 } from "react-native";
-import { NotificationChallenge } from "./notificationChallenge";
-
-const API_BASE = "https://hobi-backend-yjzs.onrender.com";
+import { HobiCharacter } from "./hobi-character";
+import { useUserProgress } from "@/hooks/user-progress";
 
 export function ChallengeCard() {
   const [completed, setCompleted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [buttonScale] = useState(() => new Animated.Value(1));
+  const { addChallenge, progress } = useUserProgress();
+
+  useEffect(() => {
+    if (progress?.lastCompletedDate) {
+      const today = new Date();
+      const lastDate = new Date(progress.lastCompletedDate);
+      if (today.toDateString() === lastDate.toDateString()) {
+        setCompleted(true);
+      }
+    }
+  }, [progress?.lastCompletedDate]);
 
   const handlePressIn = () => {
     Animated.spring(buttonScale, {
@@ -39,17 +49,7 @@ export function ChallengeCard() {
   const markAsDone = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`${API_BASE}/retos/realizado`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error del servidor: ${response.status}`);
-      }
-
+      await addChallenge();
       setCompleted(true);
       Alert.alert("¡Hecho!", "El reto ha sido marcado como realizado.");
     } catch (error) {
@@ -62,15 +62,18 @@ export function ChallengeCard() {
 
   return (
     <ThemedView style={styles.card}>
-      <NotificationChallenge />
+      <HobiCharacter />
 
-      {completed && (
-        <View style={styles.successBadge}>
-          <Text style={styles.successText}>✓ Realizado</Text>
+      <View style={styles.infoContainer}>
+        <View style={styles.badge}>
+          <Text style={styles.badgeText}>Fotografia</Text>
         </View>
-      )}
+        
+        <Text style={styles.challengeTitle}>
+          Toma una foto del atardecer
+        </Text>
+      </View>
 
-      {/* Botón Realizado */}
       <Animated.View
         style={[
           styles.buttonContainer,
@@ -90,7 +93,9 @@ export function ChallengeCard() {
           {loading ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
-            <Text style={styles.uploadButtonText}>Realizado</Text>
+            <Text style={styles.uploadButtonText}>
+              {completed ? "✓ Realizado" : "Hecho"}
+            </Text>
           )}
         </Pressable>
       </Animated.View>
@@ -100,143 +105,59 @@ export function ChallengeCard() {
 
 const styles = StyleSheet.create({
   card: {
-    width: "90%",
-    height: "100%",
-    backgroundColor: "#f5f6fa",
-    borderRadius: 24,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: "#e1e4e8",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
-    justifyContent: "center",
+    width: "85%",
+    maxWidth: 370,
+    backgroundColor: "transparent",
+    padding: 20,
     alignItems: "center",
+    alignSelf: "center",
+    marginTop: 15,
   },
-  text: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#00000072",
-    textAlign: "center",
+  infoContainer: {
+    width: "100%",
+    alignItems: "flex-start",
+    marginTop: 15,
+    marginBottom: 20,
   },
-  cardBadge: {
-    alignSelf: "flex-start",
-    backgroundColor: "#00CF3720",
-    color: "#00CF37",
+  badge: {
+    backgroundColor: "#dcdde1",
+    paddingVertical: 4,
+    paddingHorizontal:10,
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  badgeText: {
+    color: "#000",
     fontSize: 12,
     fontWeight: "bold",
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    marginBottom: 12,
-    overflow: "hidden",
   },
-  cardTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#2f3640",
-    marginBottom: 8,
-  },
-  cardDescription: {
-    fontSize: 14,
-    color: "#7f8c8d",
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  statsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    backgroundColor: "transparent",
-    marginBottom: 16,
-    gap: 12,
-  },
-  statBox: {
-    flex: 1,
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    padding: 12,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#f0f2f5",
-  },
-  statNumber: {
+  challengeTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#2f3640",
+    color: "#000",
+    textAlign: "left",
   },
-  statLabel: {
-    fontSize: 12,
-    color: "#95a5a6",
-    marginTop: 4,
-  },
-  progressContainer: {
-    backgroundColor: "transparent",
-  },
-  progressBarBg: {
-    height: 8,
-    backgroundColor: "#e1e4e8",
-    borderRadius: 4,
-    width: "100%",
-    overflow: "hidden",
-    marginBottom: 6,
-  },
-  progressBarFill: {
-    height: "100%",
-    width: "33%",
-    backgroundColor: "#ffa500",
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 12,
-    color: "#95a5a6",
-    textAlign: "right",
-  },
-  // Estilos del botón Realizado
   buttonContainer: {
     width: "100%",
     alignItems: "center",
-    marginTop: 16,
   },
   uploadButton: {
-    backgroundColor: "#5e60ce",
-    paddingVertical: 14,
+    backgroundColor: "#0055DA",
+    paddingVertical: 16,
     paddingHorizontal: 24,
-    borderRadius: 20,
-    width: "90%",
+    borderRadius: 16,
+    width: "100%",
     alignItems: "center",
-    shadowColor: "#5e60ce",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
     elevation: 4,
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 8,
   },
   uploadButtonDisabled: {
-    backgroundColor: "#00CF37",
-    shadowColor: "#00CF37",
+    backgroundColor: "#b2bec3",
+    shadowOpacity: 0,
+    elevation: 0,
   },
   uploadButtonText: {
     fontSize: 16,
     fontWeight: "bold",
     color: "#fff",
-  },
-  // Indicador de éxito
-  successBadge: {
-    marginTop: 12,
-    backgroundColor: "#00CF37",
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  successText: {
-    color: "#fff",
-    fontSize: 13,
-    fontWeight: "bold",
   },
 });

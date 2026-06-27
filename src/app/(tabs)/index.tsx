@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Redirect } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
-import { supabase } from '../../supabaseClient';
+import { supabase } from '../../../supabaseClient';
 import Home from "@/components/home"; 
 
 export default function HomeScreen() {

@@ -20,13 +20,12 @@ export function HobiCharacter({ size }: HobiCharacterProps) {
 const styles = StyleSheet.create({
     container: {
         width: "100%",
-        height: "100%",
         justifyContent: 'center',
         alignItems: 'center',
         backgroundColor: 'transparent',
     },
     image: {
-        width: "85%",
-        height: 280,
+        width: "90%",
+        height: 320,
     },
 });

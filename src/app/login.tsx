@@ -34,6 +34,7 @@ export default function LoginScreen() {
     <ThemedView style={styles.container}>
       <View>
         <Text style={styles.logo}>Hobi</Text>
+        <Text style={styles.subtitle}>Sal de tu zona de confort</Text>
       </View>
       
       <TextInput 
@@ -69,8 +70,14 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   logo: {
-    fontSize: 50,
+    fontSize: 70,
     fontWeight: 'bold',
+    color: '#4f4f4fff',
+    textAlign: 'center',
+    marginBottom: 1,
+  },
+  subtitle: {
+    fontSize: 16,
     color: '#4f4f4fff',
     textAlign: 'center',
     marginBottom: 20,

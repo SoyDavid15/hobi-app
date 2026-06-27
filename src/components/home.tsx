@@ -3,7 +3,6 @@ import { Text, StyleSheet, ScrollView, useWindowDimensions } from "react-native"
 import { ThemedView } from "@/components/themed-view";
 import { HobiCharacter } from "@/components/hobi-character";
 import { ChallengeCard } from "@/components/challenge-card";
-import ButtonsChallenge from "@/components/buttonsChallenge";
 import { supabase } from "../../supabaseClient";
 
 const Home = () => {
@@ -25,12 +24,6 @@ const Home = () => {
     const carouselHeight = screenHeight < 680 ? 250 : 320;
     const verticalPadding = screenHeight < 680 ? 20 : 40;
 
-    const handleScroll = (event: any) => {
-        const contentOffsetX = event.nativeEvent.contentOffset.x;
-        const index = Math.round(contentOffsetX / slideWidth);
-        setActiveSlide(index);
-    };
-
     return (
         <ThemedView style={styles.container}>
             <ScrollView 
@@ -41,34 +34,7 @@ const Home = () => {
                     <Text style={styles.text}>Hola, soy</Text>
                     <Text style={styles.textTitle}>Hobi</Text>
                 </ThemedView>
-
-                <ThemedView style={[styles.carouselWrapper, { width: slideWidth, height: carouselHeight }]}>
-                    <ScrollView
-                        horizontal
-                        pagingEnabled
-                        snapToInterval={slideWidth}
-                        decelerationRate="fast"
-                        showsHorizontalScrollIndicator={false}
-                        onScroll={handleScroll}
-                        scrollEventThrottle={16}
-                        contentContainerStyle={styles.carouselContent}
-                    >
-                        <ThemedView style={[styles.slide, { width: slideWidth }]}>
-                            <HobiCharacter size={carouselHeight * 0.85} />
-                        </ThemedView>
-
-                        <ThemedView style={[styles.slide, { width: slideWidth }]}>
-                            <ChallengeCard />
-                        </ThemedView>
-                    </ScrollView>
-                </ThemedView>
-
-                <ThemedView style={styles.indicatorContainer}>
-                    <ThemedView style={[styles.indicatorDot, activeSlide === 0 && styles.indicatorDotActive]} />
-                    <ThemedView style={[styles.indicatorDot, activeSlide === 1 && styles.indicatorDotActive]} />
-                </ThemedView>
-
-                <ButtonsChallenge />
+                <ChallengeCard />
             </ScrollView>
         </ThemedView>
     );
@@ -76,7 +42,7 @@ const Home = () => {
 
 const styles = StyleSheet.create({
     container: {
-        backgroundColor: "#ffffff",
+        backgroundColor: "#f0f2f5", // Light gray background
         flex: 1,
     },
     scrollContent: {
@@ -88,49 +54,18 @@ const styles = StyleSheet.create({
         backgroundColor: "transparent",
         flexDirection: 'column',
         alignItems: 'center',
-        marginBottom: 20,
+        marginBottom: 10,
         width: "90%",
     },
     text: {
-        fontSize: 20,
+        fontSize: 16,
         fontWeight: 'bold',
-        color: "#00000072",
+        color: "#95a5a6",
     },
     textTitle: {
-        fontSize: 36,
+        fontSize: 28,
         fontWeight: 'bold',
         color: "#4f4f4f",
-    },
-    carouselWrapper: {
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'transparent',
-    },
-    carouselContent: {
-        alignItems: 'center',
-    },
-    slide: {
-        height: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-        backgroundColor: 'transparent',
-    },
-    indicatorContainer: {
-        flexDirection: 'row',
-        gap: 8,
-        marginTop: 10,
-        marginBottom: 20,
-        backgroundColor: 'transparent',
-    },
-    indicatorDot: {
-        width: 8,
-        height: 8,
-        borderRadius: 4,
-        backgroundColor: "#e1e4e8",
-    },
-    indicatorDotActive: {
-        width: 20,
-        backgroundColor: "#00CF37",
     },
 });
 

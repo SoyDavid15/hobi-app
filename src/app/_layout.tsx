@@ -11,9 +11,8 @@ export default function RootLayout() {
       
       {/* Declaramos solo los archivos que SÍ existen */}
       <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="index" />
+        <Stack.Screen name="(tabs)" />
         <Stack.Screen name="login" />
-        <Stack.Screen name="explore" />
       </Stack>
     </ThemeProvider>
   );
