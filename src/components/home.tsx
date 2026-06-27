@@ -1,15 +1,26 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Text, StyleSheet, ScrollView, useWindowDimensions } from "react-native";
 import { ThemedView } from "@/components/themed-view";
 import { HobiCharacter } from "@/components/hobi-character";
 import { ChallengeCard } from "@/components/challenge-card";
 import ButtonsChallenge from "@/components/buttonsChallenge";
+import { supabase } from "../../supabaseClient";
 
 const Home = () => {
     const { width: screenWidth, height: screenHeight } = useWindowDimensions();
     const [activeSlide, setActiveSlide] = useState(0);
 
-    // Dynamic measurements for layout responsiveness
+    // Validación automática: si el usuario no existe en la BD, forzamos salida
+    useEffect(() => {
+        const verifySession = async () => {
+            const { data: { user } } = await supabase.auth.getUser();
+            if (!user) {
+                await supabase.auth.signOut();
+            }
+        };
+        verifySession();
+    }, []);
+
     const slideWidth = Math.min(screenWidth, 500);
     const carouselHeight = screenHeight < 680 ? 250 : 320;
     const verticalPadding = screenHeight < 680 ? 20 : 40;
@@ -31,7 +42,6 @@ const Home = () => {
                     <Text style={styles.textTitle}>Hobi</Text>
                 </ThemedView>
 
-                {/* Carousel Container */}
                 <ThemedView style={[styles.carouselWrapper, { width: slideWidth, height: carouselHeight }]}>
                     <ScrollView
                         horizontal
@@ -43,19 +53,16 @@ const Home = () => {
                         scrollEventThrottle={16}
                         contentContainerStyle={styles.carouselContent}
                     >
-                        {/* Slide 1: Character */}
                         <ThemedView style={[styles.slide, { width: slideWidth }]}>
                             <HobiCharacter size={carouselHeight * 0.85} />
                         </ThemedView>
 
-                        {/* Slide 2: Challenge Card */}
                         <ThemedView style={[styles.slide, { width: slideWidth }]}>
                             <ChallengeCard />
                         </ThemedView>
                     </ScrollView>
                 </ThemedView>
 
-                {/* Indicator Dots */}
                 <ThemedView style={styles.indicatorContainer}>
                     <ThemedView style={[styles.indicatorDot, activeSlide === 0 && styles.indicatorDotActive]} />
                     <ThemedView style={[styles.indicatorDot, activeSlide === 1 && styles.indicatorDotActive]} />
