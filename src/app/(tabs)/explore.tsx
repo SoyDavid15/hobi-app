@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+// Ya no usamos ThemedView como contenedor principal
 import { HobiCharacter } from '@/components/hobi-character';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { supabase } from '../../../supabaseClient';
@@ -37,7 +37,8 @@ export default function ProfileScreen() {
   };
 
   return (
-    <ThemedView style={styles.container} type="backgroundElement">
+    // CAMBIO AQUÍ: Usamos View en lugar de ThemedView para forzar el color de fondo
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
       <ScrollView
         style={styles.scrollView}
         contentInset={insets}
@@ -46,7 +47,6 @@ export default function ProfileScreen() {
       >
         <View style={styles.innerContainer}>
           
-          {/* Encabezado del Perfil */}
           <View style={styles.headerContainer}>
             <Pressable style={styles.menuButton} onPress={() => router.push('/settings')}>
               <Ionicons name="settings-outline" size={26} color={theme.text} />
@@ -65,9 +65,7 @@ export default function ProfileScreen() {
             </View>
           </View>
 
-          {/* Estadísticas */}
           <View style={styles.statsContainer}>
-            
             <View style={[styles.statCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
               <View style={[styles.iconWrapper, { backgroundColor: '#FFF0F0' }]}>
                 <Ionicons name="flame" size={26} color="#FF6B6B" />
@@ -91,10 +89,8 @@ export default function ProfileScreen() {
                 Retos Hechos
               </ThemedText>
             </View>
-
           </View>
 
-          {/* Sección de Historial / Motivación */}
           <View style={[styles.motivationContainer, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
             <ThemedText type="defaultSemiBold" style={styles.motivationTitle}>
               ¡Sigue así, {username || 'Hobi'}!
@@ -107,116 +103,27 @@ export default function ProfileScreen() {
 
         </View>
       </ScrollView>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
-  },
-  contentContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    paddingBottom: Spacing.six,
-  },
-  container: {
-    flex: 1,
-  },
-  innerContainer: {
-    maxWidth: MaxContentWidth,
-    flexGrow: 1,
-    paddingHorizontal: Spacing.five,
-  },
-  headerContainer: {
-    alignItems: 'center',
-    marginBottom: Spacing.five,
-    marginTop: Spacing.two,
-    position: 'relative',
-    paddingTop: Spacing.two,
-  },
-  menuButton: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    padding: Spacing.two,
-    zIndex: 10,
-  },
-  profileContent: {
-    alignItems: 'center',
-    marginTop: Spacing.four,
-  },
-  avatarContainer: {
-    width: 130,
-    height: 130,
-    borderRadius: 65,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: Spacing.four,
-    overflow: 'hidden',
-    borderWidth: 4,
-    borderColor: '#0055DA20',
-  },
-  username: {
-    fontSize: 26,
-    fontWeight: '700',
-    marginBottom: Spacing.one,
-  },
-  email: {
-    fontSize: 14,
-    opacity: 0.8,
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: Spacing.four,
-    marginBottom: Spacing.five,
-  },
-  statCard: {
-    flex: 1,
-    paddingVertical: Spacing.five,
-    paddingHorizontal: Spacing.four,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  iconWrapper: {
-    padding: Spacing.two,
-    borderRadius: 14,
-    marginBottom: Spacing.two,
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: Spacing.one,
-  },
-  statLabel: {
-    fontSize: 13,
-    textAlign: 'center',
-  },
-  motivationContainer: {
-    padding: Spacing.five,
-    borderRadius: 20,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 12,
-    elevation: 2,
-  },
-  motivationTitle: {
-    fontSize: 18,
-    marginBottom: Spacing.two,
-    color: '#0055DA',
-  },
-  motivationText: {
-    lineHeight: 22,
-    fontSize: 14,
-  },
+  scrollView: { flex: 1 },
+  contentContainer: { flexDirection: 'row', justifyContent: 'center', paddingBottom: Spacing.six },
+  container: { flex: 1 }, // Aquí se aplicará el color del tema
+  innerContainer: { maxWidth: MaxContentWidth, flexGrow: 1, paddingHorizontal: Spacing.five },
+  headerContainer: { alignItems: 'center', marginBottom: Spacing.five, marginTop: Spacing.two, position: 'relative', paddingTop: Spacing.two },
+  menuButton: { position: 'absolute', top: 0, right: 0, padding: Spacing.two, zIndex: 10 },
+  profileContent: { alignItems: 'center', marginTop: Spacing.four },
+  avatarContainer: { width: 130, height: 130, borderRadius: 65, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.four, overflow: 'hidden', borderWidth: 4, borderColor: '#0055DA20' },
+  username: { fontSize: 26, fontWeight: '700', marginBottom: Spacing.one },
+  email: { fontSize: 14, opacity: 0.8 },
+  statsContainer: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.four, marginBottom: Spacing.five },
+  statCard: { flex: 1, paddingVertical: Spacing.five, paddingHorizontal: Spacing.four, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, elevation: 2 },
+  iconWrapper: { padding: Spacing.two, borderRadius: 14, marginBottom: Spacing.two },
+  statValue: { fontSize: 28, fontWeight: 'bold', marginBottom: Spacing.one },
+  statLabel: { fontSize: 13, textAlign: 'center' },
+  motivationContainer: { padding: Spacing.five, borderRadius: 20, borderWidth: 1 },
+  motivationTitle: { fontSize: 18, marginBottom: Spacing.two, color: '#0055DA' },
+  motivationText: { lineHeight: 22, fontSize: 14 },
 });
