@@ -3,10 +3,18 @@ import { Redirect } from 'expo-router';
 import { ActivityIndicator, View } from 'react-native';
 import { supabase } from '../../../supabaseClient';
 import Home from "@/components/home"; 
+import { useUserProgress } from '@/hooks/user-progress';
+import { useChallengeNotification } from '../../../notifications';
 
 export default function HomeScreen() {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Consumo del progreso del usuario
+  const { dailyChallenge } = useUserProgress();
+  
+  // Ejecución del hook seguro contra crasheos
+  useChallengeNotification(dailyChallenge);
 
   useEffect(() => {
     // 1. Verificamos la sesión actual
@@ -23,16 +31,13 @@ export default function HomeScreen() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Mientras carga, mostramos un spinner
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" color="#000" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#000' }}>
+        <ActivityIndicator size="large" color="#fff" />
       </View>
     );
   }
 
-  // Si no hay sesión, al login.
-  // Si hay sesión, verificamos si el token todavía funciona al intentar cargar Home
   return session ? <Home /> : <Redirect href="/login" />;
 }

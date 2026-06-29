@@ -9,13 +9,7 @@ export default function RootLayout() {
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AnimatedSplashOverlay />
       
-      {/* Declaramos solo los archivos que SÍ existen */}
-      <Stack 
-        screenOptions={{ headerShown: false }}
-        unstable_settings={{
-          theme: colorScheme === 'dark' ? DarkTheme : DefaultTheme,
-        }}
-      >
+      <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="login" />
         <Stack.Screen name="settings" />
