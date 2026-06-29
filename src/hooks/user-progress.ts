@@ -2,9 +2,17 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
 
 const API_BASE = "https://hobi-backend-yjzs.onrender.com";
-// O si estás probando en local:
-// const API_BASE = "http://192.168.x.x:8000"; 
-// (Asegúrate de reemplazarlo si tu backend corre en tu máquina y no en onrender)
+
+export interface DailyChallenge {
+  Musica: string | null;
+  Lectura: string | null;
+  Cine_y_Television: string | null;
+  Videojuegos: string | null;
+  Comida: string | null;
+  Deporte: string | null;
+  Salir: string | null;
+  Arte: string | null;
+}
 
 export interface UserProgress {
   completedChallenges: number;
@@ -21,6 +29,7 @@ const DEFAULT_PROGRESS: UserProgress = {
 export function useUserProgress() {
   const [progress, setProgress] = useState<UserProgress>(DEFAULT_PROGRESS);
   const [loading, setLoading] = useState(true);
+  const [dailyChallenge, setDailyChallenge] = useState<DailyChallenge | null>(null);
 
   const loadProgress = async () => {
     try {
@@ -46,8 +55,21 @@ export function useUserProgress() {
     }
   };
 
+  const loadDailyChallenge = async () => {
+    try {
+      const response = await fetch(`${API_BASE}/retos`);
+      if (response.ok) {
+        const data = await response.json();
+        setDailyChallenge(data);
+      }
+    } catch (e) {
+      console.error('Failed to load daily challenge from backend', e);
+    }
+  };
+
   useEffect(() => {
     loadProgress();
+    loadDailyChallenge();
   }, []);
 
   const addChallenge = useCallback(async () => {
@@ -76,7 +98,7 @@ export function useUserProgress() {
       }
     } catch (e) {
       console.error('Failed to save progress to backend', e);
-      throw e; // Propagar el error para que challenge-card muestre la alerta si falla
+      throw e;
     }
   }, []);
 
@@ -85,5 +107,6 @@ export function useUserProgress() {
     loading,
     addChallenge,
     refreshProgress: loadProgress,
+    dailyChallenge,
   };
 }

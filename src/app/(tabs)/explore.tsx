@@ -10,10 +10,12 @@ import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { supabase } from '../../../supabaseClient';
 import { useUserProgress } from '@/hooks/user-progress';
 import { useRouter } from 'expo-router';
+import { useTheme } from '@/hooks/use-theme';
 
 export default function ProfileScreen() {
   const router = useRouter();
   const safeAreaInsets = useSafeAreaInsets();
+  const theme = useTheme();
   
   const { progress } = useUserProgress(); 
   
@@ -40,16 +42,18 @@ export default function ProfileScreen() {
         style={styles.scrollView}
         contentInset={insets}
         contentContainerStyle={[styles.contentContainer, { paddingTop: insets.top || Spacing.six }]}
+        showsVerticalScrollIndicator={false}
       >
         <View style={styles.innerContainer}>
           
           {/* Encabezado del Perfil */}
           <View style={styles.headerContainer}>
             <Pressable style={styles.menuButton} onPress={() => router.push('/settings')}>
-              <Ionicons name="settings-outline" size={28} color="#4f4f4f" />
+              <Ionicons name="settings-outline" size={26} color={theme.text} />
             </Pressable>
+            
             <View style={styles.profileContent}>
-              <View style={styles.avatarContainer}>
+              <View style={[styles.avatarContainer, { backgroundColor: theme.backgroundElement }]}>
                 <HobiCharacter />
               </View>
               <ThemedText type="subtitle" style={styles.username}>
@@ -64,43 +68,47 @@ export default function ProfileScreen() {
           {/* Estadísticas */}
           <View style={styles.statsContainer}>
             
-            <ThemedView type="backgroundElement" style={styles.statCard}>
-              <Ionicons name="flame" size={32} color="#FF6B6B" />
+            <View style={[styles.statCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+              <View style={[styles.iconWrapper, { backgroundColor: '#FFF0F0' }]}>
+                <Ionicons name="flame" size={26} color="#FF6B6B" />
+              </View>
               <ThemedText type="subtitle" style={styles.statValue}>
-                {progress.streak}
+                {progress?.streak ?? 0}
               </ThemedText>
               <ThemedText type="small" themeColor="textSecondary" style={styles.statLabel}>
                 Días de Racha
               </ThemedText>
-            </ThemedView>
+            </View>
 
-            <ThemedView type="backgroundElement" style={styles.statCard}>
-              <Ionicons name="checkmark-circle" size={32} color="#4CAF50" />
+            <View style={[styles.statCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+              <View style={[styles.iconWrapper, { backgroundColor: '#EAFCEB' }]}>
+                <Ionicons name="checkmark-circle" size={26} color="#4CAF50" />
+              </View>
               <ThemedText type="subtitle" style={styles.statValue}>
-                {progress.completedChallenges}
+                {progress?.completedChallenges ?? 0}
               </ThemedText>
               <ThemedText type="small" themeColor="textSecondary" style={styles.statLabel}>
                 Retos Hechos
               </ThemedText>
-            </ThemedView>
+            </View>
 
           </View>
 
           {/* Sección de Historial / Motivación */}
-          <ThemedView type="backgroundElement" style={styles.motivationContainer}>
+          <View style={[styles.motivationContainer, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
             <ThemedText type="defaultSemiBold" style={styles.motivationTitle}>
-              ¡Sigue así!
+              ¡Sigue así, {username || 'Hobi'}!
             </ThemedText>
             <ThemedText themeColor="textSecondary" style={styles.motivationText}>
               Completar retos diarios te ayuda a descubrir nuevos pasatiempos y mejorar tu bienestar. 
-              Vuelve mañana para continuar tu racha de {progress.streak} días.
+              Vuelve mañana para continuar tu racha de {progress?.streak ?? 0} días.
             </ThemedText>
-          </ThemedView>
+          </View>
 
-</View>
-       </ScrollView>
-     </ThemedView>
-   );
+        </View>
+      </ScrollView>
+    </ThemedView>
+  );
 }
 
 const styles = StyleSheet.create({
@@ -118,12 +126,12 @@ const styles = StyleSheet.create({
   innerContainer: {
     maxWidth: MaxContentWidth,
     flexGrow: 1,
-    paddingHorizontal: Spacing.four,
+    paddingHorizontal: Spacing.five,
   },
   headerContainer: {
     alignItems: 'center',
-    marginBottom: Spacing.six,
-    marginTop: Spacing.four,
+    marginBottom: Spacing.five,
+    marginTop: Spacing.two,
     position: 'relative',
     paddingTop: Spacing.two,
   },
@@ -136,56 +144,71 @@ const styles = StyleSheet.create({
   },
   profileContent: {
     alignItems: 'center',
-    marginTop: Spacing.three,
+    marginTop: Spacing.four,
   },
   avatarContainer: {
-    width: 150,
-    height: 150,
-    borderRadius: 75,
-    backgroundColor: '#E8F0FE',
+    width: 130,
+    height: 130,
+    borderRadius: 65,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: Spacing.three,
+    marginBottom: Spacing.four,
     overflow: 'hidden',
+    borderWidth: 4,
+    borderColor: '#0055DA20',
   },
   username: {
-    fontSize: 24,
+    fontSize: 26,
+    fontWeight: '700',
     marginBottom: Spacing.one,
   },
   email: {
     fontSize: 14,
+    opacity: 0.8,
   },
   statsContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: Spacing.three,
-    marginBottom: Spacing.six,
+    gap: Spacing.four,
+    marginBottom: Spacing.five,
   },
   statCard: {
     flex: 1,
-    padding: Spacing.four,
-    borderRadius: Spacing.four,
+    paddingVertical: Spacing.five,
+    paddingHorizontal: Spacing.four,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 2,
+    borderWidth: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2,
+  },
+  iconWrapper: {
+    padding: Spacing.two,
+    borderRadius: 14,
+    marginBottom: Spacing.two,
   },
   statValue: {
     fontSize: 28,
-    marginTop: Spacing.two,
+    fontWeight: 'bold',
     marginBottom: Spacing.one,
   },
   statLabel: {
+    fontSize: 13,
     textAlign: 'center',
   },
   motivationContainer: {
     padding: Spacing.five,
-    borderRadius: Spacing.four,
+    borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#dcdde1',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.04,
+    shadowRadius: 12,
+    elevation: 2,
   },
   motivationTitle: {
     fontSize: 18,
@@ -194,5 +217,6 @@ const styles = StyleSheet.create({
   },
   motivationText: {
     lineHeight: 22,
+    fontSize: 14,
   },
 });

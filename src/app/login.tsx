@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { supabase } from "../../supabaseClient";
+import { useTheme } from "@/hooks/use-theme"; // Asumiendo que este hook existe en tu proyecto
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -18,6 +19,8 @@ export default function LoginScreen() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [username, setUsername] = useState("");
   const [isLogin, setIsLogin] = useState(true);
+  
+  const theme = useTheme(); // Obtenemos el objeto de colores del sistema
 
   const validateUsername = (text: string) => {
     const validPattern = /^[a-zA-Z0-9_]+$/;
@@ -50,18 +53,11 @@ export default function LoginScreen() {
       const { error } = await supabase.auth.signUp({ 
         email, 
         password,
-        options: {
-          data: {
-            displayName: username,
-          }
-        }
+        options: { data: { displayName: username } }
       });
+      
       if (error) {
-        if (error.message?.includes('rate limit') || error.message?.includes('Rate limit')) {
-          Alert.alert("Límite alcanzado", "Has alcanzado el límite de correos. Por favor espera unos minutos antes de intentar de nuevo.");
-        } else {
-          Alert.alert("Error", error.message);
-        }
+        Alert.alert("Error", error.message);
       } else {
         Alert.alert("Registro exitoso", "Ya puedes iniciar sesión");
         setIsLogin(true);
@@ -70,6 +66,7 @@ export default function LoginScreen() {
   }
 
   return (
+    // ThemedView se adapta al color de fondo automáticamente
     <ThemedView style={styles.container}>
       <View>
         <ThemedText type="title" style={styles.logo}>Hobi</ThemedText>
@@ -77,31 +74,38 @@ export default function LoginScreen() {
       </View>
 
       <TextInput
-        style={styles.input}
+        style={[styles.input, { color: theme.text, borderColor: theme.textSecondary }]}
         placeholder="Email"
+        placeholderTextColor={theme.textSecondary}
         onChangeText={setEmail}
         autoCapitalize="none"
         keyboardType="email-address"
       />
+      
       {!isLogin && (
         <TextInput
-          style={styles.input}
-          placeholder="Nombre de usuario (display name)"
+          style={[styles.input, { color: theme.text, borderColor: theme.textSecondary }]}
+          placeholder="Nombre de usuario"
+          placeholderTextColor={theme.textSecondary}
           onChangeText={setUsername}
           autoCapitalize="none"
           maxLength={20}
         />
       )}
+      
       <TextInput
-        style={styles.input}
+        style={[styles.input, { color: theme.text, borderColor: theme.textSecondary }]}
         placeholder="Contraseña"
+        placeholderTextColor={theme.textSecondary}
         secureTextEntry
         onChangeText={setPassword}
       />
+      
       {!isLogin && (
         <TextInput
-          style={styles.input}
+          style={[styles.input, { color: theme.text, borderColor: theme.textSecondary }]}
           placeholder="Confirmar contraseña"
+          placeholderTextColor={theme.textSecondary}
           secureTextEntry
           onChangeText={setConfirmPassword}
         />
@@ -110,6 +114,7 @@ export default function LoginScreen() {
       <Button
         title={isLogin ? "Iniciar Sesión" : "Registrarse"}
         onPress={handleSubmit}
+        color="#0055DA"
       />
 
       <TouchableOpacity
@@ -146,7 +151,6 @@ const styles = StyleSheet.create({
   input: {
     height: 50,
     borderWidth: 1,
-    borderColor: "#ccc",
     borderRadius: 8,
     marginBottom: 15,
     paddingHorizontal: 15,

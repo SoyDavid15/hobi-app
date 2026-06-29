@@ -1,62 +1,93 @@
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
-import { useUserProgress } from "@/hooks/user-progress";
-import { useMemo, useState } from "react";
+import { useUserProgress, DailyChallenge } from "@/hooks/user-progress";
+import { useMemo, useState, useEffect } from "react";
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Pressable,
   StyleSheet,
   View,
+  Alert,
 } from "react-native";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HobiCharacter } from "./hobi-character";
 import { useTheme } from "@/hooks/use-theme";
 
+const getNonEmptyChallenge = (challenge: DailyChallenge | null): string => {
+  if (!challenge) return "Cargando reto...";
+  const entries = Object.entries(challenge);
+  for (const [, value] of entries) {
+    if (value) return value;
+  }
+  return "No hay retos disponibles";
+};
+
 export function ChallengeCard() {
-  const [loading, setLoading] = useState(false);
+  const [isMarking, setIsMarking] = useState(false);
+  const [isLocalLoading, setIsLocalLoading] = useState(true);
+  const [lastSavedChallenge, setLastSavedChallenge] = useState<string | null>(null);
   const [buttonScale] = useState(() => new Animated.Value(1));
-  const { addChallenge, progress, loading: backendLoading } = useUserProgress();
+
+  const { addChallenge, progress, loading: backendLoading, dailyChallenge } = useUserProgress();
   const theme = useTheme();
-  
+
+  const challengeText = useMemo(() => getNonEmptyChallenge(dailyChallenge), [dailyChallenge]);
+
+  // Bloqueo de UI: Mientras esto sea true, el botón está deshabilitado
+  const isStillLoading = isLocalLoading || backendLoading || challengeText === "Cargando reto...";
+
+  // 1. Cargar el estado guardado en disco al iniciar
+  useEffect(() => {
+    const loadSavedChallenge = async () => {
+      try {
+        const saved = await AsyncStorage.getItem('lastCompletedChallenge');
+        setLastSavedChallenge(saved);
+      } catch (e) {
+        console.error("Error cargando caché", e);
+      } finally {
+        setIsLocalLoading(false);
+      }
+    };
+    loadSavedChallenge();
+  }, []);
+
+  // 2. Determinar si está completado: lógica prioritaria
   const completed = useMemo(() => {
+    if (isStillLoading) return false;
+
+    // Verificación 1: Si el texto del reto actual es igual al que ya marcamos en disco
+    if (lastSavedChallenge === challengeText && challengeText !== "No hay retos disponibles") {
+      return true;
+    }
+
+    // Verificación 2: Seguridad adicional con fecha del servidor
     if (!progress?.lastCompletedDate) return false;
-    const today = new Date();
-    const lastDate = new Date(progress.lastCompletedDate);
-    return today.toDateString() === lastDate.toDateString();
-  }, [progress?.lastCompletedDate]);
+    const today = new Date().toDateString();
+    const lastDate = new Date(progress.lastCompletedDate).toDateString();
+    return today === lastDate;
+  }, [progress?.lastCompletedDate, lastSavedChallenge, challengeText, isStillLoading]);
 
   const handlePressIn = () => {
-    Animated.spring(buttonScale, {
-      toValue: 0.95,
-      useNativeDriver: true,
-      speed: 50,
-      bounciness: 4,
-    }).start();
+    Animated.spring(buttonScale, { toValue: 0.95, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
   };
 
   const handlePressOut = () => {
-    Animated.spring(buttonScale, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 30,
-      bounciness: 8,
-    }).start();
+    Animated.spring(buttonScale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 8 }).start();
   };
 
   const markAsDone = async () => {
-    setLoading(true);
+    setIsMarking(true);
     try {
       await addChallenge();
+      // Guardamos el reto actual para bloquearlo incluso si reinician la app
+      await AsyncStorage.setItem('lastCompletedChallenge', challengeText);
+      setLastSavedChallenge(challengeText);
       Alert.alert("¡Hecho!", "El reto ha sido marcado como realizado.");
     } catch (error) {
-      console.error("Error al marcar como realizado:", error);
-      Alert.alert(
-        "Error",
-        "No se pudo marcar el reto como realizado. Inténtalo de nuevo.",
-      );
+      Alert.alert("Error", "No se pudo marcar el reto como realizado.");
     } finally {
-      setLoading(false);
+      setIsMarking(false);
     }
   };
 
@@ -69,30 +100,25 @@ export function ChallengeCard() {
           <ThemedText style={styles.badgeText}>Reto Diario</ThemedText>
         </View>
 
-        <ThemedText style={styles.challengeTitle} type="defaultSemiBold">Toma una foto del atardecer</ThemedText>
+        <ThemedText style={styles.challengeTitle} type="defaultSemiBold">
+          {challengeText}
+        </ThemedText>
       </View>
 
-      <Animated.View
-        style={[
-          styles.buttonContainer,
-          { transform: [{ scale: buttonScale }] },
-        ]}
-      >
+      <Animated.View style={[styles.buttonContainer, { transform: [{ scale: buttonScale }] }]}>
         <Pressable
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           onPress={markAsDone}
           style={[
             styles.uploadButton,
-            (loading || completed || backendLoading) &&
-              styles.uploadButtonDisabled,
+            (isMarking || completed || isStillLoading) && styles.uploadButtonDisabled,
           ]}
-          disabled={loading || completed || backendLoading}
+          // El botón está deshabilitado mientras carga o si ya está hecho
+          disabled={isMarking || completed || isStillLoading}
         >
-          {loading ? (
+          {isMarking || isStillLoading ? (
             <ActivityIndicator color="#fff" size="small" />
-          ) : backendLoading ? (
-            <ThemedText style={styles.uploadButtonText}>Conectando...</ThemedText>
           ) : (
             <ThemedText style={styles.uploadButtonText}>
               {completed ? "✓ Realizado" : "Hecho"}
@@ -126,19 +152,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 12,
   },
-  badgeText: {
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  challengeTitle: {
-    fontSize: 16,
-    fontWeight: "bold",
-    textAlign: "left",
-  },
-  buttonContainer: {
-    width: "100%",
-    alignItems: "center",
-  },
+  badgeText: { fontSize: 12, fontWeight: "bold" },
+  challengeTitle: { fontSize: 16, fontWeight: "bold", textAlign: "left" },
+  buttonContainer: { width: "100%", alignItems: "center" },
   uploadButton: {
     backgroundColor: "#0055DA",
     paddingVertical: 16,
@@ -153,9 +169,5 @@ const styles = StyleSheet.create({
     shadowOpacity: 0,
     elevation: 0,
   },
-  uploadButtonText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#fff",
-  },
+  uploadButtonText: { fontSize: 16, fontWeight: "bold", color: "#fff" },
 });
