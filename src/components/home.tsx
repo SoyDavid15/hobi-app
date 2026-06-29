@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
-import { Text, StyleSheet, ScrollView, useWindowDimensions } from "react-native";
+import { StyleSheet, ScrollView, useWindowDimensions } from "react-native";
 import { ThemedView } from "@/components/themed-view";
-import { HobiCharacter } from "@/components/hobi-character";
+import { ThemedText } from "@/components/themed-text";
 import { ChallengeCard } from "@/components/challenge-card";
 import { supabase } from "../../supabaseClient";
 
@@ -25,14 +25,14 @@ const Home = () => {
     const verticalPadding = screenHeight < 680 ? 20 : 40;
 
     return (
-        <ThemedView style={styles.container}>
+        <ThemedView style={styles.container} type="backgroundElement">
             <ScrollView 
                 contentContainerStyle={[styles.scrollContent, { paddingVertical: verticalPadding }]}
                 showsVerticalScrollIndicator={false}
             >
-                <ThemedView style={styles.textContainer}>
-                    <Text style={styles.text}>Hola, soy</Text>
-                    <Text style={styles.textTitle}>Hobi</Text>
+                <ThemedView style={styles.textContainer} type="background">
+                    <ThemedText style={styles.text} themeColor="textSecondary">Hola, soy</ThemedText>
+                    <ThemedText style={styles.textTitle}>Hobi</ThemedText>
                 </ThemedView>
                 <ChallengeCard />
             </ScrollView>
@@ -42,7 +42,6 @@ const Home = () => {
 
 const styles = StyleSheet.create({
     container: {
-        backgroundColor: "#f0f2f5", // Light gray background
         flex: 1,
     },
     scrollContent: {
@@ -60,12 +59,10 @@ const styles = StyleSheet.create({
     text: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: "#95a5a6",
     },
     textTitle: {
         fontSize: 28,
         fontWeight: 'bold',
-        color: "#4f4f4f",
     },
 });
 

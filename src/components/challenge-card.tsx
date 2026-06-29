@@ -1,31 +1,29 @@
 import { ThemedView } from "@/components/themed-view";
-import { useState, useEffect } from "react";
+import { ThemedText } from "@/components/themed-text";
+import { useUserProgress } from "@/hooks/user-progress";
+import { useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
   Animated,
   Pressable,
   StyleSheet,
-  Text,
   View,
 } from "react-native";
 import { HobiCharacter } from "./hobi-character";
-import { useUserProgress } from "@/hooks/user-progress";
+import { useTheme } from "@/hooks/use-theme";
 
 export function ChallengeCard() {
-  const [completed, setCompleted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [buttonScale] = useState(() => new Animated.Value(1));
-  const { addChallenge, progress } = useUserProgress();
-
-  useEffect(() => {
-    if (progress?.lastCompletedDate) {
-      const today = new Date();
-      const lastDate = new Date(progress.lastCompletedDate);
-      if (today.toDateString() === lastDate.toDateString()) {
-        setCompleted(true);
-      }
-    }
+  const { addChallenge, progress, loading: backendLoading } = useUserProgress();
+  const theme = useTheme();
+  
+  const completed = useMemo(() => {
+    if (!progress?.lastCompletedDate) return false;
+    const today = new Date();
+    const lastDate = new Date(progress.lastCompletedDate);
+    return today.toDateString() === lastDate.toDateString();
   }, [progress?.lastCompletedDate]);
 
   const handlePressIn = () => {
@@ -50,11 +48,13 @@ export function ChallengeCard() {
     setLoading(true);
     try {
       await addChallenge();
-      setCompleted(true);
       Alert.alert("¡Hecho!", "El reto ha sido marcado como realizado.");
     } catch (error) {
       console.error("Error al marcar como realizado:", error);
-      Alert.alert("Error", "No se pudo marcar el reto como realizado. Inténtalo de nuevo.");
+      Alert.alert(
+        "Error",
+        "No se pudo marcar el reto como realizado. Inténtalo de nuevo.",
+      );
     } finally {
       setLoading(false);
     }
@@ -65,13 +65,11 @@ export function ChallengeCard() {
       <HobiCharacter />
 
       <View style={styles.infoContainer}>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>Fotografia</Text>
+        <View style={[styles.badge, { backgroundColor: theme.backgroundElement }]}>
+          <ThemedText style={styles.badgeText}>Reto Diario</ThemedText>
         </View>
-        
-        <Text style={styles.challengeTitle}>
-          Toma una foto del atardecer
-        </Text>
+
+        <ThemedText style={styles.challengeTitle} type="defaultSemiBold">Toma una foto del atardecer</ThemedText>
       </View>
 
       <Animated.View
@@ -86,16 +84,19 @@ export function ChallengeCard() {
           onPress={markAsDone}
           style={[
             styles.uploadButton,
-            (loading || completed) && styles.uploadButtonDisabled,
+            (loading || completed || backendLoading) &&
+              styles.uploadButtonDisabled,
           ]}
-          disabled={loading || completed}
+          disabled={loading || completed || backendLoading}
         >
           {loading ? (
             <ActivityIndicator color="#fff" size="small" />
+          ) : backendLoading ? (
+            <ThemedText style={styles.uploadButtonText}>Conectando...</ThemedText>
           ) : (
-            <Text style={styles.uploadButtonText}>
+            <ThemedText style={styles.uploadButtonText}>
               {completed ? "✓ Realizado" : "Hecho"}
-            </Text>
+            </ThemedText>
           )}
         </Pressable>
       </Animated.View>
@@ -120,21 +121,18 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   badge: {
-    backgroundColor: "#dcdde1",
     paddingVertical: 4,
-    paddingHorizontal:10,
+    paddingHorizontal: 10,
     borderRadius: 10,
     marginBottom: 12,
   },
   badgeText: {
-    color: "#000",
     fontSize: 12,
     fontWeight: "bold",
   },
   challengeTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    color: "#000",
     textAlign: "left",
   },
   buttonContainer: {
