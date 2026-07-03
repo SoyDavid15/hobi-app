@@ -15,9 +15,20 @@ import { HobiCharacter } from "./hobi-character";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/providers/auth-provider";
 import * as ImagePicker from "expo-image-picker";
-import axios from "axios";
+
 
 const API_URL = "https://hobi-backend-yjzs.onrender.com";
+
+const uriToBlob = async (uri: string): Promise<Blob> => {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.onload = () => resolve(xhr.response);
+    xhr.onerror = () => reject(new Error("Error al leer el archivo"));
+    xhr.responseType = "blob";
+    xhr.open("GET", uri, true);
+    xhr.send(null);
+  });
+};
 
 const getNonEmptyChallenge = (challenge: DailyChallenge | null): string => {
   if (!challenge) return "Cargando reto...";
@@ -33,18 +44,60 @@ const uploadWithRetry = async (
   retriesLeft: number,
   timeoutMs: number
 ): Promise<void> => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    await axios.post(`${API_URL}/retos/realizado`, formData, {
-      headers: { Accept: "application/json" },
-      timeout: timeoutMs,
+    const response = await fetch(`${API_URL}/retos/realizado`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "multipart/form-data",
+      },
+      body: formData,
+      signal: controller.signal,
     });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      const error = new Error(
+        errorData.detail || `Error del servidor: ${response.status}`
+      );
+      (error as any).response = { data: errorData, status: response.status };
+      throw error;
+    }
   } catch (error: any) {
+    clearTimeout(timeoutId);
+
+    if (error?.name === "AbortError") {
+      error.code = "ECONNABORTED";
+    }
+
     if (retriesLeft <= 0) throw error;
 
     const delayMs = 2000 * (3 - retriesLeft);
     await new Promise((resolve) => setTimeout(resolve, delayMs));
     return uploadWithRetry(formData, retriesLeft - 1, timeoutMs);
   }
+};
+
+const formatTime = (seconds: number): string => {
+  if (seconds <= 0) return "0h 0m";
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (h > 0) {
+    return `${h}h ${m}m`;
+  }
+  return `${m}m ${s}s`;
+};
+
+const getPeriodTitle = (period: string | undefined): string => {
+  if (period === "morning") return "Reto de la Mañana";
+  if (period === "afternoon") return "Reto de la Tarde";
+  return "Reto Diario";
 };
 
 export function ChallengeCard() {
@@ -57,21 +110,42 @@ export function ChallengeCard() {
     "idle" | "uploading" | "waking" | "success" | "error"
   >("idle");
   const [buttonScale] = useState(() => new Animated.Value(1));
+  const [timeRemaining, setTimeRemaining] = useState<number>(0);
+  const [blockedUntilNext, setBlockedUntilNext] = useState<boolean>(false);
 
-  const { loading: backendLoading, dailyChallenge, refreshProgress } =
-    useUserProgress();
+  const {
+    loading: backendLoading,
+    dailyChallenge,
+    refreshProgress,
+    refreshDailyChallenge,
+  } = useUserProgress();
   const { session } = useAuth();
   const theme = useTheme();
 
   const challengeText = getNonEmptyChallenge(dailyChallenge);
   const isStillLoading =
-    isLocalLoading || backendLoading || challengeText === "Cargando reto...";
+    isLocalLoading ||
+    backendLoading ||
+    challengeText === "Cargando reto...";
+
+  const currentPeriod = dailyChallenge?.period || "";
+  const isPeriodEnded = timeRemaining <= 0;
 
   useEffect(() => {
     const loadSavedChallenge = async () => {
       try {
         const saved = await AsyncStorage.getItem("lastCompletedChallenge");
+        const savedPeriod = await AsyncStorage.getItem(
+          "lastCompletedChallengePeriod"
+        );
         setLastSavedChallenge(saved);
+
+        if (saved && savedPeriod === currentPeriod) {
+          setBlockedUntilNext(true);
+        } else if (saved && savedPeriod !== currentPeriod) {
+          await AsyncStorage.setItem("lastCompletedChallengePeriod", "");
+          setBlockedUntilNext(false);
+        }
       } catch (e) {
         console.error("Error cargando caché", e);
       } finally {
@@ -79,7 +153,26 @@ export function ChallengeCard() {
       }
     };
     loadSavedChallenge();
-  }, []);
+  }, [currentPeriod]);
+
+  useEffect(() => {
+    if (dailyChallenge?.time_remaining) {
+      setTimeRemaining(dailyChallenge.time_remaining);
+
+      const timer = setInterval(() => {
+        setTimeRemaining((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            refreshDailyChallenge();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
+      return () => clearInterval(timer);
+    }
+  }, [dailyChallenge?.time_remaining, refreshDailyChallenge]);
 
   const completed = (() => {
     if (isStillLoading) return false;
@@ -90,6 +183,13 @@ export function ChallengeCard() {
       return true;
     return false;
   })();
+
+  const isButtonDisabled =
+    isMarking ||
+    completed ||
+    isStillLoading ||
+    blockedUntilNext ||
+    isPeriodEnded;
 
   const handlePressIn = () => {
     Animated.spring(buttonScale, {
@@ -107,6 +207,10 @@ export function ChallengeCard() {
       speed: 30,
       bounciness: 8,
     }).start();
+  };
+
+  const getUserTimezoneOffset = (): number => {
+    return -new Date().getTimezoneOffset() / 60;
   };
 
   const markAsDone = async () => {
@@ -145,24 +249,49 @@ export function ChallengeCard() {
       const formData = new FormData();
       formData.append("user_id", String(session.user.id));
       formData.append("reto_texto", challengeText);
+      formData.append("period", currentPeriod);
+      formData.append("user_timezone_offset", String(getUserTimezoneOffset()));
 
       const fileName =
         asset.fileName || asset.uri.split("/").pop() || "reto.jpg";
       const mimeType = asset.mimeType || "image/jpeg";
 
-      formData.append("file", {
-        uri: asset.uri,
-        name: fileName,
-        type: mimeType,
-      } as any);
+      try {
+        const fileBlob = await uriToBlob(asset.uri);
+        formData.append("file", fileBlob, fileName);
+      } catch (blobError) {
+        console.error("Error al convertir la imagen:", blobError);
+        setIsMarking(false);
+        setUploadStatus("error");
+        Alert.alert(
+          "Error",
+          "No se pudo leer la imagen capturada. Intenta tomar otra foto."
+        );
+        return;
+      }
 
-      // intento rápido — si el servidor está despierto, entra al instante
       setUploadStatus("uploading");
       try {
-        await axios.post(`${API_URL}/retos/realizado`, formData, {
-          headers: { Accept: "application/json" },
-          timeout: 15000,
+        const response = await fetch(`${API_URL}/retos/realizado`, {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            "Content-Type": "multipart/form-data",
+          },
+          body: formData,
         });
+
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}));
+          const error = new Error(
+            errorData.detail || `Error del servidor: ${response.status}`
+          );
+          (error as any).response = {
+            data: errorData,
+            status: response.status,
+          };
+          throw error;
+        }
       } catch (firstError: any) {
         if (firstError.code === "ECONNABORTED") {
           setUploadStatus("waking");
@@ -173,7 +302,12 @@ export function ChallengeCard() {
       }
 
       await AsyncStorage.setItem("lastCompletedChallenge", challengeText);
+      await AsyncStorage.setItem(
+        "lastCompletedChallengePeriod",
+        currentPeriod
+      );
       setLastSavedChallenge(challengeText);
+      setBlockedUntilNext(true);
       await refreshProgress();
 
       setUploadStatus("success");
@@ -203,7 +337,8 @@ export function ChallengeCard() {
   };
 
   const getButtonLabel = () => {
-    if (uploadStatus === "waking") return "Despertando servidor...";
+    if (blockedUntilNext) return "✓ Completado";
+    if (isPeriodEnded) return "Esperando nuevo reto...";
     if (isMarking || isStillLoading) return "";
     if (completed) return "✓ Realizado";
     return "Tomar foto y realizar";
@@ -227,7 +362,7 @@ export function ChallengeCard() {
 
     return (
       <ThemedText style={styles.uploadButtonText}>
-        {completed ? "✓ Realizado" : "Tomar foto y realizar"}
+        {getButtonLabel()}
       </ThemedText>
     );
   };
@@ -242,11 +377,20 @@ export function ChallengeCard() {
             { backgroundColor: theme.backgroundElement },
           ]}
         >
-          <ThemedText style={styles.badgeText}>Reto Diario</ThemedText>
+          <ThemedText style={styles.badgeText}>
+            {getPeriodTitle(dailyChallenge?.period)}
+          </ThemedText>
         </View>
         <ThemedText style={styles.challengeTitle} type="defaultSemiBold">
           {challengeText}
         </ThemedText>
+        <View style={styles.countdownContainer}>
+          <View style={styles.countdownBadge}>
+            <ThemedText style={styles.countdownText}>
+              ⏰ {formatTime(timeRemaining)}
+            </ThemedText>
+          </View>
+        </View>
       </View>
 
       <Animated.View
@@ -261,10 +405,9 @@ export function ChallengeCard() {
           onPress={markAsDone}
           style={[
             styles.uploadButton,
-            (isMarking || completed || isStillLoading) &&
-              styles.uploadButtonDisabled,
+            isButtonDisabled && styles.uploadButtonDisabled,
           ]}
-          disabled={isMarking || completed || isStillLoading}
+          disabled={isButtonDisabled}
         >
           {getButtonElement()}
         </Pressable>
@@ -297,6 +440,22 @@ const styles = StyleSheet.create({
   },
   badgeText: { fontSize: 12, fontWeight: "bold" },
   challengeTitle: { fontSize: 16, fontWeight: "bold", textAlign: "left" },
+  countdownContainer: {
+    marginTop: 8,
+    width: "100%",
+  },
+  countdownBadge: {
+    backgroundColor: "#0055DA20",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignSelf: "flex-start",
+  },
+  countdownText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#0055DA",
+  },
   buttonContainer: { width: "100%", alignItems: "center" },
   uploadButton: {
     backgroundColor: "#0055DA",

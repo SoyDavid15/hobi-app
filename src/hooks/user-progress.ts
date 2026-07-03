@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "../../supabaseClient";
-import axios from "axios";
+
 
 const API_BASE = "https://hobi-backend-yjzs.onrender.com";
 
@@ -15,12 +15,32 @@ const fetchWithWakeup = async <T,>(
   const timeout = config?.timeout ?? INITIAL_TIMEOUT;
 
   for (let attempt = 0; attempt <= RETRY_COUNT; attempt++) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(
+      () => controller.abort(),
+      attempt === 0 ? timeout : timeout * 2
+    );
+
     try {
-      const response = await axios.get<T>(url, {
-        timeout: attempt === 0 ? timeout : timeout * 2,
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: { Accept: "application/json" },
       });
-      return response.data;
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+      }
+
+      return await response.json();
     } catch (error: any) {
+      clearTimeout(timeoutId);
+
+      if (error?.name === "AbortError") {
+        error.code = "ECONNABORTED";
+      }
+
       if (attempt === RETRY_COUNT) throw error;
       const delay = RETRY_DELAY_BASE * (attempt + 1);
       await new Promise((resolve) => setTimeout(resolve, delay));
@@ -28,6 +48,10 @@ const fetchWithWakeup = async <T,>(
   }
 
   throw new Error("fetchWithWakeup: unexpected end of retries");
+};
+
+const getUserTimezoneOffset = (): number => {
+  return -new Date().getTimezoneOffset() / 60;
 };
 
 export interface DailyChallenge {
@@ -39,6 +63,8 @@ export interface DailyChallenge {
   Deporte: string | null;
   Salir: string | null;
   Arte: string | null;
+  period?: string;
+  time_remaining?: number;
 }
 
 export interface UserProgress {
@@ -96,24 +122,27 @@ export function useUserProgress() {
     }
   }, []);
 
-  const loadDailyChallenge = async () => {
+  const loadDailyChallenge = useCallback(async () => {
     try {
-      const data = await fetchWithWakeup<DailyChallenge>(`${API_BASE}/retos`);
+      const timezoneOffset = getUserTimezoneOffset();
+      const data = await fetchWithWakeup<DailyChallenge>(
+        `${API_BASE}/retos?user_timezone_offset=${timezoneOffset}`
+      );
       setDailyChallenge(data);
       setError(null);
     } catch (e: any) {
       console.error("Error al cargar reto diario:", e.message);
     }
-  };
+  }, []);
 
   useEffect(() => {
     loadProgress();
     loadDailyChallenge();
 
     keepAliveRef.current = setInterval(() => {
-      axios
-        .get(`${API_BASE}/retos`, { timeout: 8000 })
-        .catch(() => {});
+      fetch(`${API_BASE}/retos`, {
+        headers: { Accept: "application/json" },
+      }).catch(() => {});
     }, KEEPALIVE_INTERVAL);
 
     return () => {
@@ -122,7 +151,7 @@ export function useUserProgress() {
         keepAliveRef.current = null;
       }
     };
-  }, [loadProgress]);
+  }, [loadProgress, loadDailyChallenge]);
 
   return {
     progress,
@@ -130,6 +159,7 @@ export function useUserProgress() {
     error,
     refreshProgress: loadProgress,
     dailyChallenge,
+    refreshDailyChallenge: loadDailyChallenge,
   };
 }
 
@@ -138,6 +168,7 @@ export interface UserPhoto {
   reto: string;
   fecha: string | null;
   nombre: string;
+  period?: string;
 }
 
 export interface UserPhotosResponse {
