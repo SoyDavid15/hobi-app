@@ -1,6 +1,6 @@
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
-import { useUserProgress, DailyChallenge } from "@/hooks/user-progress";
+import { useUserProgress, DailyChallenge } from "@/hooks/user-progress"; 
 import { useMemo, useState, useEffect } from "react";
 import {
   ActivityIndicator,
@@ -13,6 +13,11 @@ import {
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HobiCharacter } from "./hobi-character";
 import { useTheme } from "@/hooks/use-theme";
+import * as ImagePicker from 'expo-image-picker';
+import { supabase } from "../../supabaseClient";
+import axios from 'axios'; 
+
+const API_URL = "https://hobi-backend-yjzs.onrender.com"; 
 
 const getNonEmptyChallenge = (challenge: DailyChallenge | null): string => {
   if (!challenge) return "Cargando reto...";
@@ -29,15 +34,13 @@ export function ChallengeCard() {
   const [lastSavedChallenge, setLastSavedChallenge] = useState<string | null>(null);
   const [buttonScale] = useState(() => new Animated.Value(1));
 
-  const { addChallenge, progress, loading: backendLoading, dailyChallenge } = useUserProgress();
+  // 💡 Mapeamos la función del hook correctamente
+  const { progress, loading: backendLoading, dailyChallenge, refreshProgress } = useUserProgress();
   const theme = useTheme();
 
   const challengeText = useMemo(() => getNonEmptyChallenge(dailyChallenge), [dailyChallenge]);
-
-  // Bloqueo de UI: Mientras esto sea true, el botón está deshabilitado
   const isStillLoading = isLocalLoading || backendLoading || challengeText === "Cargando reto...";
 
-  // 1. Cargar el estado guardado en disco al iniciar
   useEffect(() => {
     const loadSavedChallenge = async () => {
       try {
@@ -52,16 +55,9 @@ export function ChallengeCard() {
     loadSavedChallenge();
   }, []);
 
-  // 2. Determinar si está completado: lógica prioritaria
   const completed = useMemo(() => {
     if (isStillLoading) return false;
-
-    // Verificación 1: Si el texto del reto actual es igual al que ya marcamos en disco
-    if (lastSavedChallenge === challengeText && challengeText !== "No hay retos disponibles") {
-      return true;
-    }
-
-    // Verificación 2: Seguridad adicional con fecha del servidor
+    if (lastSavedChallenge === challengeText && challengeText !== "No hay retos disponibles") return true;
     if (!progress?.lastCompletedDate) return false;
     const today = new Date().toDateString();
     const lastDate = new Date(progress.lastCompletedDate).toDateString();
@@ -77,15 +73,75 @@ export function ChallengeCard() {
   };
 
   const markAsDone = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert("Permiso denegado", "Necesitamos permiso para acceder a la cámara.");
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 0.7,
+    });
+
+    const uploadWithRetry = async (formData: any, retries = 2) => {
+  try {
+    return await axios.post(`${API_URL}/retos/realizado`, formData, { timeout: 30000 });
+  } catch (error: any) {
+    if (retries > 0) {
+      console.log("Servidor despertando, reintentando...");
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Espera 2 segundos
+      return uploadWithRetry(formData, retries - 1);
+    }
+    throw error;
+  }
+};
+
+    if (result.canceled) return;
+
     setIsMarking(true);
+    
     try {
-      await addChallenge();
-      // Guardamos el reto actual para bloquearlo incluso si reinician la app
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      
+      if (userError || !user) {
+        Alert.alert("Error", "Debes iniciar sesión para completar el reto.");
+        setIsMarking(false);
+        return;
+      }
+
+      const asset = result.assets[0];
+      const formData = new FormData();
+      formData.append('user_id', String(user.id)); 
+
+      const fileName = asset.fileName || asset.uri.split('/').pop() || 'reto.jpg';
+      const mimeType = asset.mimeType || 'image/jpeg';
+
+      formData.append('file', {
+        uri: asset.uri,
+        name: fileName,
+        type: mimeType,
+      } as any);
+
+      // --- SUBIDA A BACKEND ---
+      await axios.post(`${API_URL}/retos/realizado`, formData, {
+        headers: { 'Accept': 'application/json' },
+        timeout:80000
+      });
+
+      // --- ÉXITO ---
       await AsyncStorage.setItem('lastCompletedChallenge', challengeText);
       setLastSavedChallenge(challengeText);
-      Alert.alert("¡Hecho!", "El reto ha sido marcado como realizado.");
-    } catch (error) {
-      Alert.alert("Error", "No se pudo marcar el reto como realizado.");
+      
+      // 💡 Actualizamos la UI inmediatamente llamando a refreshProgress del hook
+      await refreshProgress(); 
+      
+      Alert.alert("¡Éxito!", "Reto completado correctamente.");
+      
+    } catch (error: any) {
+      console.error("Error al subir:", error);
+      Alert.alert("Error", error.response?.data?.detail || "No se pudo subir la foto.");
     } finally {
       setIsMarking(false);
     }
@@ -94,12 +150,10 @@ export function ChallengeCard() {
   return (
     <ThemedView style={styles.card}>
       <HobiCharacter />
-
       <View style={styles.infoContainer}>
         <View style={[styles.badge, { backgroundColor: theme.backgroundElement }]}>
           <ThemedText style={styles.badgeText}>Reto Diario</ThemedText>
         </View>
-
         <ThemedText style={styles.challengeTitle} type="defaultSemiBold">
           {challengeText}
         </ThemedText>
@@ -110,18 +164,14 @@ export function ChallengeCard() {
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           onPress={markAsDone}
-          style={[
-            styles.uploadButton,
-            (isMarking || completed || isStillLoading) && styles.uploadButtonDisabled,
-          ]}
-          // El botón está deshabilitado mientras carga o si ya está hecho
+          style={[styles.uploadButton, (isMarking || completed || isStillLoading) && styles.uploadButtonDisabled]}
           disabled={isMarking || completed || isStillLoading}
         >
           {isMarking || isStillLoading ? (
             <ActivityIndicator color="#fff" size="small" />
           ) : (
             <ThemedText style={styles.uploadButtonText}>
-              {completed ? "✓ Realizado" : "Hecho"}
+              {completed ? "✓ Realizado" : "Tomar foto y realizar"}
             </ThemedText>
           )}
         </Pressable>

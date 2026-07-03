@@ -11,16 +11,30 @@ import { useTheme, triggerThemeChange } from '@/hooks/use-theme';
 import { supabase } from '../../supabaseClient';
 
 const THEME_KEY = '@hobi-theme';
+const NOTIFICATIONS_KEY = '@hobi-notifications-enabled'; // Nueva clave para persistencia
 
 export default function SettingsScreen() {
   const router = useRouter();
   const theme = useTheme();
   const [isDark, setIsDark] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true); // true por defecto
 
   useEffect(() => {
+    // Cargar preferencia del tema
     AsyncStorage.getItem(THEME_KEY).then((saved) => {
       if (saved !== null) {
         setIsDark(saved === 'dark');
+      }
+    });
+
+    // Cargar preferencia de notificaciones
+    AsyncStorage.getItem(NOTIFICATIONS_KEY).then((saved) => {
+      if (saved !== null) {
+        // Si ya hay un valor guardado ('true' o 'false'), lo asignamos
+        setNotificationsEnabled(saved === 'true');
+      } else {
+        // Si es la primera vez (null), se mantiene activado y lo guardamos
+        AsyncStorage.setItem(NOTIFICATIONS_KEY, 'true');
       }
     });
   }, []);
@@ -30,6 +44,12 @@ export default function SettingsScreen() {
     setIsDark(value);
     AsyncStorage.setItem(THEME_KEY, newTheme);
     triggerThemeChange(newTheme);
+  };
+
+  // Nueva función para alternar las notificaciones
+  const toggleNotifications = (value: boolean) => {
+    setNotificationsEnabled(value);
+    AsyncStorage.setItem(NOTIFICATIONS_KEY, String(value));
   };
 
   return (
@@ -49,11 +69,21 @@ export default function SettingsScreen() {
             Preferencias
           </ThemedText>
           
-          <Pressable style={styles.settingItem}>
-            <Ionicons name="notifications-outline" size={22} color={theme.text} />
+          {/* Item de Notificaciones Modificado con Switch */}
+          <View style={styles.settingItem}>
+            <Ionicons 
+              name={notificationsEnabled ? "notifications" : "notifications-outline"} 
+              size={22} 
+              color={theme.text} 
+            />
             <ThemedText style={styles.settingLabel}>Notificaciones</ThemedText>
-            <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
-          </Pressable>
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={toggleNotifications}
+              trackColor={{ false: '#ccc', true: '#0055DA' }}
+              thumbColor={notificationsEnabled ? '#0055DA' : '#f4f3f4'}
+            />
+          </View>
 
           <View style={styles.settingItem}>
             <Ionicons name={isDark ? "moon" : "moon-outline"} size={22} color={theme.text} />

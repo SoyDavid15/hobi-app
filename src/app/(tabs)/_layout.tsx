@@ -36,6 +36,16 @@ export default function TabsLayout() {
           ),
         }}
       />
+
+      <Tabs.Screen
+        name="feed"
+        options={{
+          title: 'Feed',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'list' : 'list-outline'} size={22} color={color} />
+          ),
+        }}
+      />
       
       <Tabs.Screen
         name="profile"

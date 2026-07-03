@@ -35,6 +35,12 @@
             "imageWidth": 76
           }
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "cameraPermission": "Necesitamos acceso a tu cámara para subir el reto."
+        }
       ]
     ],
     "experiments": {

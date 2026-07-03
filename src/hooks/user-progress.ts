@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../supabaseClient';
+import axios from 'axios';
 
 const API_BASE = "https://hobi-backend-yjzs.onrender.com";
 
@@ -31,7 +32,8 @@ export function useUserProgress() {
   const [loading, setLoading] = useState(true);
   const [dailyChallenge, setDailyChallenge] = useState<DailyChallenge | null>(null);
 
-  const loadProgress = async () => {
+  // Cargar progreso del usuario (GET) con timeout aumentado
+  const loadProgress = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -39,74 +41,45 @@ export function useUserProgress() {
         return;
       }
 
-      const response = await fetch(`${API_BASE}/progreso/${user.id}`);
-      if (response.ok) {
-        const data = await response.json();
-        setProgress({
-          completedChallenges: data.completed_challenges,
-          streak: data.streak,
-          lastCompletedDate: data.last_completed_date
-        });
-      }
-    } catch (e) {
-      console.error('Failed to load progress from backend', e);
+      // 💡 Timeout de 30s para despertar al servidor de Render
+      const response = await axios.get(`${API_BASE}/progreso/${user.id}`, {
+        timeout: 80000 
+      });
+      
+      setProgress({
+        completedChallenges: response.data.completed_challenges || 0,
+        streak: response.data.streak || 0,
+        lastCompletedDate: response.data.last_completed_date || null
+      });
+    } catch (e: any) {
+      console.error('Error al cargar progreso del backend:', e.message);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
+  // Cargar reto diario (GET) con timeout aumentado
   const loadDailyChallenge = async () => {
     try {
-      const response = await fetch(`${API_BASE}/retos`);
-      if (response.ok) {
-        const data = await response.json();
-        setDailyChallenge(data);
-      }
-    } catch (e) {
-      console.error('Failed to load daily challenge from backend', e);
+      // 💡 Timeout de 30s para despertar al servidor de Render
+      const response = await axios.get(`${API_BASE}/retos`, {
+        timeout: 30000
+      });
+      setDailyChallenge(response.data);
+    } catch (e: any) {
+      console.error('Error al cargar reto diario:', e.message);
     }
   };
 
   useEffect(() => {
     loadProgress();
     loadDailyChallenge();
-  }, []);
-
-  const addChallenge = useCallback(async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const response = await fetch(`${API_BASE}/retos/realizado`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ user_id: user.id })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setProgress(prev => ({
-          ...prev,
-          completedChallenges: data.completed_challenges,
-          streak: data.streak,
-          lastCompletedDate: new Date().toISOString()
-        }));
-      } else {
-        throw new Error(`Error del servidor: ${response.status}`);
-      }
-    } catch (e) {
-      console.error('Failed to save progress to backend', e);
-      throw e;
-    }
-  }, []);
+  }, [loadProgress]);
 
   return {
     progress,
     loading,
-    addChallenge,
-    refreshProgress: loadProgress,
+    refreshProgress: loadProgress, 
     dailyChallenge,
   };
 }

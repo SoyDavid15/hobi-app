@@ -33,6 +33,14 @@ export function useChallengeNotification(challenge: any) {
     }
 
     const checkAndNotify = async () => {
+      // 1. VERIFICACIÓN DE PREFERENCIA: Leemos el estado del Switch de configuración
+      const isEnabledSetting = await AsyncStorage.getItem('@hobi-notifications-enabled');
+      
+      // Si el usuario las apagó explícitamente, cancelamos la ejecución
+      if (isEnabledSetting === 'false') {
+        return; 
+      }
+
       const currentChallengeString = JSON.stringify(challenge);
       const lastNotified = await AsyncStorage.getItem('lastNotifiedChallenge');
 
@@ -50,7 +58,7 @@ export function useChallengeNotification(challenge: any) {
           await Notifications.scheduleNotificationAsync({
             content: {
               title: "¡Nuevo reto disponible! 🚀",
-              body: "Un nuevo desafío ha llegado. ¡Supérate hoy!",
+              body: "No dejes que se enfríe tu racha!",
             },
             trigger: null,
           });
