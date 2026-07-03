@@ -1,7 +1,7 @@
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
-import { useUserProgress, DailyChallenge } from "@/hooks/user-progress"; 
-import { useMemo, useState, useEffect } from "react";
+import { useUserProgress, DailyChallenge } from "@/hooks/user-progress";
+import { useState, useEffect } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -10,14 +10,14 @@ import {
   View,
   Alert,
 } from "react-native";
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { HobiCharacter } from "./hobi-character";
 import { useTheme } from "@/hooks/use-theme";
-import * as ImagePicker from 'expo-image-picker';
-import { supabase } from "../../supabaseClient";
-import axios from 'axios'; 
+import { useAuth } from "@/providers/auth-provider";
+import * as ImagePicker from "expo-image-picker";
+import axios from "axios";
 
-const API_URL = "https://hobi-backend-yjzs.onrender.com"; 
+const API_URL = "https://hobi-backend-yjzs.onrender.com";
 
 const getNonEmptyChallenge = (challenge: DailyChallenge | null): string => {
   if (!challenge) return "Cargando reto...";
@@ -28,23 +28,49 @@ const getNonEmptyChallenge = (challenge: DailyChallenge | null): string => {
   return "No hay retos disponibles";
 };
 
+const uploadWithRetry = async (
+  formData: FormData,
+  retriesLeft: number,
+  timeoutMs: number
+): Promise<void> => {
+  try {
+    await axios.post(`${API_URL}/retos/realizado`, formData, {
+      headers: { Accept: "application/json" },
+      timeout: timeoutMs,
+    });
+  } catch (error: any) {
+    if (retriesLeft <= 0) throw error;
+
+    const delayMs = 2000 * (3 - retriesLeft);
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    return uploadWithRetry(formData, retriesLeft - 1, timeoutMs);
+  }
+};
+
 export function ChallengeCard() {
   const [isMarking, setIsMarking] = useState(false);
   const [isLocalLoading, setIsLocalLoading] = useState(true);
-  const [lastSavedChallenge, setLastSavedChallenge] = useState<string | null>(null);
+  const [lastSavedChallenge, setLastSavedChallenge] = useState<string | null>(
+    null
+  );
+  const [uploadStatus, setUploadStatus] = useState<
+    "idle" | "uploading" | "waking" | "success" | "error"
+  >("idle");
   const [buttonScale] = useState(() => new Animated.Value(1));
 
-  // 💡 Mapeamos la función del hook correctamente
-  const { progress, loading: backendLoading, dailyChallenge, refreshProgress } = useUserProgress();
+  const { loading: backendLoading, dailyChallenge, refreshProgress } =
+    useUserProgress();
+  const { session } = useAuth();
   const theme = useTheme();
 
-  const challengeText = useMemo(() => getNonEmptyChallenge(dailyChallenge), [dailyChallenge]);
-  const isStillLoading = isLocalLoading || backendLoading || challengeText === "Cargando reto...";
+  const challengeText = getNonEmptyChallenge(dailyChallenge);
+  const isStillLoading =
+    isLocalLoading || backendLoading || challengeText === "Cargando reto...";
 
   useEffect(() => {
     const loadSavedChallenge = async () => {
       try {
-        const saved = await AsyncStorage.getItem('lastCompletedChallenge');
+        const saved = await AsyncStorage.getItem("lastCompletedChallenge");
         setLastSavedChallenge(saved);
       } catch (e) {
         console.error("Error cargando caché", e);
@@ -55,27 +81,41 @@ export function ChallengeCard() {
     loadSavedChallenge();
   }, []);
 
-  const completed = useMemo(() => {
+  const completed = (() => {
     if (isStillLoading) return false;
-    if (lastSavedChallenge === challengeText && challengeText !== "No hay retos disponibles") return true;
-    if (!progress?.lastCompletedDate) return false;
-    const today = new Date().toDateString();
-    const lastDate = new Date(progress.lastCompletedDate).toDateString();
-    return today === lastDate;
-  }, [progress?.lastCompletedDate, lastSavedChallenge, challengeText, isStillLoading]);
+    if (
+      lastSavedChallenge === challengeText &&
+      challengeText !== "No hay retos disponibles"
+    )
+      return true;
+    return false;
+  })();
 
   const handlePressIn = () => {
-    Animated.spring(buttonScale, { toValue: 0.95, useNativeDriver: true, speed: 50, bounciness: 4 }).start();
+    Animated.spring(buttonScale, {
+      toValue: 0.95,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 4,
+    }).start();
   };
 
   const handlePressOut = () => {
-    Animated.spring(buttonScale, { toValue: 1, useNativeDriver: true, speed: 30, bounciness: 8 }).start();
+    Animated.spring(buttonScale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 30,
+      bounciness: 8,
+    }).start();
   };
 
   const markAsDone = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      Alert.alert("Permiso denegado", "Necesitamos permiso para acceder a la cámara.");
+    if (status !== "granted") {
+      Alert.alert(
+        "Permiso denegado",
+        "Necesitamos permiso para acceder a la cámara."
+      );
       return;
     }
 
@@ -85,73 +125,123 @@ export function ChallengeCard() {
       quality: 0.7,
     });
 
-    const uploadWithRetry = async (formData: any, retries = 2) => {
-  try {
-    return await axios.post(`${API_URL}/retos/realizado`, formData, { timeout: 30000 });
-  } catch (error: any) {
-    if (retries > 0) {
-      console.log("Servidor despertando, reintentando...");
-      await new Promise(resolve => setTimeout(resolve, 2000)); // Espera 2 segundos
-      return uploadWithRetry(formData, retries - 1);
-    }
-    throw error;
-  }
-};
-
     if (result.canceled) return;
 
     setIsMarking(true);
-    
+    setUploadStatus("uploading");
+
     try {
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError || !user) {
-        Alert.alert("Error", "Debes iniciar sesión para completar el reto.");
+      if (!session?.user) {
+        Alert.alert(
+          "Error de sesión",
+          "Debes iniciar sesión nuevamente para completar el reto."
+        );
         setIsMarking(false);
+        setUploadStatus("idle");
         return;
       }
 
       const asset = result.assets[0];
       const formData = new FormData();
-      formData.append('user_id', String(user.id)); 
+      formData.append("user_id", String(session.user.id));
+      formData.append("reto_texto", challengeText);
 
-      const fileName = asset.fileName || asset.uri.split('/').pop() || 'reto.jpg';
-      const mimeType = asset.mimeType || 'image/jpeg';
+      const fileName =
+        asset.fileName || asset.uri.split("/").pop() || "reto.jpg";
+      const mimeType = asset.mimeType || "image/jpeg";
 
-      formData.append('file', {
+      formData.append("file", {
         uri: asset.uri,
         name: fileName,
         type: mimeType,
       } as any);
 
-      // --- SUBIDA A BACKEND ---
-      await axios.post(`${API_URL}/retos/realizado`, formData, {
-        headers: { 'Accept': 'application/json' },
-        timeout:80000
-      });
+      // intento rápido — si el servidor está despierto, entra al instante
+      setUploadStatus("uploading");
+      try {
+        await axios.post(`${API_URL}/retos/realizado`, formData, {
+          headers: { Accept: "application/json" },
+          timeout: 15000,
+        });
+      } catch (firstError: any) {
+        if (firstError.code === "ECONNABORTED") {
+          setUploadStatus("waking");
+          await uploadWithRetry(formData, 3, 45000);
+        } else {
+          throw firstError;
+        }
+      }
 
-      // --- ÉXITO ---
-      await AsyncStorage.setItem('lastCompletedChallenge', challengeText);
+      await AsyncStorage.setItem("lastCompletedChallenge", challengeText);
       setLastSavedChallenge(challengeText);
-      
-      // 💡 Actualizamos la UI inmediatamente llamando a refreshProgress del hook
-      await refreshProgress(); 
-      
+      await refreshProgress();
+
+      setUploadStatus("success");
       Alert.alert("¡Éxito!", "Reto completado correctamente.");
-      
     } catch (error: any) {
       console.error("Error al subir:", error);
-      Alert.alert("Error", error.response?.data?.detail || "No se pudo subir la foto.");
+      setUploadStatus("error");
+
+      let message = "No se pudo subir la foto. Intenta de nuevo.";
+      if (error.response?.data?.detail) {
+        message = error.response.data.detail;
+      } else if (error.code === "ECONNABORTED") {
+        message =
+          "El servidor tardó demasiado en responder. Intenta de nuevo en unos segundos.";
+      } else if (error.message?.includes("Network")) {
+        message =
+          "Error de conexión. Verifica tu internet e intenta de nuevo.";
+      }
+
+      Alert.alert("Error", message);
     } finally {
       setIsMarking(false);
+      if (uploadStatus === "waking" || uploadStatus === "uploading") {
+        setUploadStatus("idle");
+      }
     }
+  };
+
+  const getButtonLabel = () => {
+    if (uploadStatus === "waking") return "Despertando servidor...";
+    if (isMarking || isStillLoading) return "";
+    if (completed) return "✓ Realizado";
+    return "Tomar foto y realizar";
+  };
+
+  const getButtonElement = () => {
+    if (isMarking || isStillLoading || uploadStatus === "waking") {
+      return (
+        <View style={styles.loadingRow}>
+          <ActivityIndicator color="#fff" size="small" />
+          <ThemedText style={styles.uploadButtonText}>
+            {uploadStatus === "waking"
+              ? " Despertando servidor..."
+              : isLocalLoading
+                ? " Cargando..."
+                : " Subiendo..."}
+          </ThemedText>
+        </View>
+      );
+    }
+
+    return (
+      <ThemedText style={styles.uploadButtonText}>
+        {completed ? "✓ Realizado" : "Tomar foto y realizar"}
+      </ThemedText>
+    );
   };
 
   return (
     <ThemedView style={styles.card}>
       <HobiCharacter />
       <View style={styles.infoContainer}>
-        <View style={[styles.badge, { backgroundColor: theme.backgroundElement }]}>
+        <View
+          style={[
+            styles.badge,
+            { backgroundColor: theme.backgroundElement },
+          ]}
+        >
           <ThemedText style={styles.badgeText}>Reto Diario</ThemedText>
         </View>
         <ThemedText style={styles.challengeTitle} type="defaultSemiBold">
@@ -159,21 +249,24 @@ export function ChallengeCard() {
         </ThemedText>
       </View>
 
-      <Animated.View style={[styles.buttonContainer, { transform: [{ scale: buttonScale }] }]}>
+      <Animated.View
+        style={[
+          styles.buttonContainer,
+          { transform: [{ scale: buttonScale }] },
+        ]}
+      >
         <Pressable
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           onPress={markAsDone}
-          style={[styles.uploadButton, (isMarking || completed || isStillLoading) && styles.uploadButtonDisabled]}
+          style={[
+            styles.uploadButton,
+            (isMarking || completed || isStillLoading) &&
+              styles.uploadButtonDisabled,
+          ]}
           disabled={isMarking || completed || isStillLoading}
         >
-          {isMarking || isStillLoading ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
-            <ThemedText style={styles.uploadButtonText}>
-              {completed ? "✓ Realizado" : "Tomar foto y realizar"}
-            </ThemedText>
-          )}
+          {getButtonElement()}
         </Pressable>
       </Animated.View>
     </ThemedView>
@@ -220,4 +313,9 @@ const styles = StyleSheet.create({
     elevation: 0,
   },
   uploadButtonText: { fontSize: 16, fontWeight: "bold", color: "#fff" },
+  loadingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

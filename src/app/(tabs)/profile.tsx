@@ -1,14 +1,14 @@
 import { useState, useEffect } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 
 import { ThemedText } from '@/components/themed-text';
-// Ya no usamos ThemedView como contenedor principal
 import { HobiCharacter } from '@/components/hobi-character';
 import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
 import { supabase } from '../../../supabaseClient';
-import { useUserProgress } from '@/hooks/user-progress';
+import { useUserProgress, useUserPhotos } from '@/hooks/user-progress';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -17,7 +17,8 @@ export default function ProfileScreen() {
   const safeAreaInsets = useSafeAreaInsets();
   const theme = useTheme();
   
-  const { progress } = useUserProgress(); 
+  const { progress } = useUserProgress();
+  const { photos, loading: photosLoading, error: photosError } = useUserPhotos();
   
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
@@ -36,8 +37,13 @@ export default function ProfileScreen() {
     bottom: safeAreaInsets.bottom + BottomTabInset + Spacing.three,
   };
 
+  const formatDate = (isoString: string | null) => {
+    if (!isoString) return '';
+    const date = new Date(isoString);
+    return date.toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' });
+  };
+
   return (
-    // CAMBIO AQUÍ: Usamos View en lugar de ThemedView para forzar el color de fondo
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <ScrollView
         style={styles.scrollView}
@@ -101,6 +107,56 @@ export default function ProfileScreen() {
             </ThemedText>
           </View>
 
+          <View style={[styles.galleryContainer, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+            <ThemedText type="defaultSemiBold" style={styles.galleryTitle}>
+              Tus Retos Completados
+            </ThemedText>
+
+            {photosLoading ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={theme.textSecondary} />
+                <ThemedText themeColor="textSecondary" style={styles.loadingText}>
+                  Cargando fotos...
+                </ThemedText>
+              </View>
+            ) : photosError ? (
+              <View style={styles.errorContainer}>
+                <Ionicons name="cloud-offline-outline" size={48} color={theme.textSecondary} />
+                <ThemedText themeColor="textSecondary" style={styles.errorText}>
+                  {photosError}
+                </ThemedText>
+              </View>
+            ) : photos.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Ionicons name="camera-outline" size={48} color={theme.textSecondary} />
+                <ThemedText themeColor="textSecondary" style={styles.emptyText}>
+                  Aún no has completado ningún reto. ¡Empieza hoy!
+                </ThemedText>
+              </View>
+            ) : (
+              <View style={styles.photosList}>
+                {photos.map((photo, index) => (
+                  <View key={index} style={[styles.photoCard, { borderColor: theme.border }]}>
+                    <Image
+                      source={{ uri: photo.url }}
+                      style={styles.photoImage}
+                      contentFit="cover"
+                      transition={200}
+                    />
+                    <View style={styles.photoInfo}>
+                      <ThemedText type="defaultSemiBold" style={styles.photoReto}>
+                        {photo.reto}
+                      </ThemedText>
+                      <ThemedText themeColor="textSecondary" style={styles.photoFecha}>
+                        {formatDate(photo.fecha)}
+                      </ThemedText>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+          </View>
+
         </View>
       </ScrollView>
     </View>
@@ -110,7 +166,7 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   scrollView: { flex: 1 },
   contentContainer: { flexDirection: 'row', justifyContent: 'center', paddingBottom: Spacing.six },
-  container: { flex: 1 }, // Aquí se aplicará el color del tema
+  container: { flex: 1 },
   innerContainer: { maxWidth: MaxContentWidth, flexGrow: 1, paddingHorizontal: Spacing.five },
   headerContainer: { alignItems: 'center', marginBottom: Spacing.five, marginTop: Spacing.two, position: 'relative', paddingTop: Spacing.two },
   menuButton: { position: 'absolute', top: 0, right: 0, padding: Spacing.two, zIndex: 10 },
@@ -126,4 +182,18 @@ const styles = StyleSheet.create({
   motivationContainer: { padding: Spacing.five, borderRadius: 20, borderWidth: 1 },
   motivationTitle: { fontSize: 18, marginBottom: Spacing.two, color: '#0055DA' },
   motivationText: { lineHeight: 22, fontSize: 14 },
+  galleryContainer: { padding: Spacing.five, borderRadius: 20, borderWidth: 1, marginTop: Spacing.five },
+  galleryTitle: { fontSize: 18, marginBottom: Spacing.four, color: '#0055DA', textAlign: 'center' },
+  loadingContainer: { alignItems: 'center', paddingVertical: Spacing.four },
+  loadingText: { marginTop: Spacing.two, fontSize: 14 },
+  errorContainer: { alignItems: 'center', paddingVertical: Spacing.four },
+  errorText: { marginTop: Spacing.two, fontSize: 14, textAlign: 'center' },
+  emptyContainer: { alignItems: 'center', paddingVertical: Spacing.four },
+  emptyText: { marginTop: Spacing.two, fontSize: 14, textAlign: 'center' },
+  photosList: { gap: Spacing.three },
+  photoCard: { borderWidth: 1, borderRadius: 16, overflow: 'hidden' },
+  photoImage: { width: '100%', height: 200 },
+  photoInfo: { padding: Spacing.three },
+  photoReto: { fontSize: 15, marginBottom: Spacing.half },
+  photoFecha: { fontSize: 13 },
 });
