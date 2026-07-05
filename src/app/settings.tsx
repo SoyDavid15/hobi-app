@@ -103,6 +103,15 @@ export default function SettingsScreen() {
               Español
             </ThemedText>
           </Pressable>
+
+          <Pressable 
+            style={styles.settingItem}
+            onPress={() => router.push('/hobby-selector')}
+          >
+            <Ionicons name="apps-outline" size={22} color={theme.text} />
+            <ThemedText style={styles.settingLabel}>Mis Hobbies</ThemedText>
+            <Ionicons name="chevron-forward" size={18} color={theme.textSecondary} />
+          </Pressable>
         </ThemedView>
 
         <ThemedView type="backgroundElement" style={styles.section}>

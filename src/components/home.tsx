@@ -1,13 +1,19 @@
-import { useEffect, useRef } from "react";
-import { StyleSheet, ScrollView } from "react-native";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { StyleSheet, ScrollView, View } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect } from "expo-router";
+
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { ChallengeCard } from "@/components/challenge-card";
 import { useAuth } from "@/providers/auth-provider";
 
+const SELECTED_HOBBIES_KEY = "@hobi-selected-hobbies";
+
 const Home = () => {
   const { session, signOut } = useAuth();
   const mountedRef = useRef(true);
+  const [selectedHobbies, setSelectedHobbies] = useState<string[]>([]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -21,6 +27,25 @@ const Home = () => {
     };
   }, [session, signOut]);
 
+  useFocusEffect(
+    useCallback(() => {
+      AsyncStorage.getItem(SELECTED_HOBBIES_KEY).then((saved) => {
+        if (mountedRef.current) {
+          if (saved) {
+            try {
+              const parsed = JSON.parse(saved);
+              setSelectedHobbies(Array.isArray(parsed) ? parsed : []);
+            } catch {
+              setSelectedHobbies([saved]);
+            }
+          } else {
+            setSelectedHobbies([]);
+          }
+        }
+      });
+    }, [])
+  );
+
   return (
     <ThemedView style={styles.container} type="backgroundElement">
       <ScrollView
@@ -33,7 +58,8 @@ const Home = () => {
           </ThemedText>
           <ThemedText style={styles.textTitle}>Hobi</ThemedText>
         </ThemedView>
-        <ChallengeCard />
+
+        <ChallengeCard selectedCategories={selectedHobbies} />
       </ScrollView>
     </ThemedView>
   );

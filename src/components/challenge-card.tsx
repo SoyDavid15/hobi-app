@@ -1,7 +1,7 @@
 import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { useUserProgress, DailyChallenge } from "@/hooks/user-progress";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ActivityIndicator,
   Animated,
@@ -30,11 +30,27 @@ const uriToBlob = async (uri: string): Promise<Blob> => {
   });
 };
 
-const getNonEmptyChallenge = (challenge: DailyChallenge | null): string => {
+const getNonEmptyChallenge = (
+  challenge: DailyChallenge | null,
+  selectedCategories?: string[]
+): string => {
   if (!challenge) return "Cargando reto...";
+
+  const categories = selectedCategories?.length
+    ? selectedCategories.filter((c) => {
+        const value = challenge[c as keyof DailyChallenge];
+        return value && typeof value === "string";
+      })
+    : [];
+
+  if (categories.length > 0) {
+    const pick = categories[Math.floor(Math.random() * categories.length)];
+    return challenge[pick as keyof DailyChallenge] as string;
+  }
+
   const entries = Object.entries(challenge);
   for (const [, value] of entries) {
-    if (value) return value;
+    if (value && typeof value === "string") return value;
   }
   return "No hay retos disponibles";
 };
@@ -100,7 +116,11 @@ const getPeriodTitle = (period: string | undefined): string => {
   return "Reto Diario";
 };
 
-export function ChallengeCard() {
+interface ChallengeCardProps {
+  selectedCategories?: string[];
+}
+
+export function ChallengeCard({ selectedCategories }: ChallengeCardProps) {
   const [isMarking, setIsMarking] = useState(false);
   const [isLocalLoading, setIsLocalLoading] = useState(true);
   const [lastSavedChallenge, setLastSavedChallenge] = useState<string | null>(
@@ -112,6 +132,7 @@ export function ChallengeCard() {
   const [buttonScale] = useState(() => new Animated.Value(1));
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [blockedUntilNext, setBlockedUntilNext] = useState<boolean>(false);
+  const [currentChallengeText, setCurrentChallengeText] = useState<string>("");
 
   const {
     loading: backendLoading,
@@ -122,7 +143,19 @@ export function ChallengeCard() {
   const { session } = useAuth();
   const theme = useTheme();
 
-  const challengeText = getNonEmptyChallenge(dailyChallenge);
+  // Memorizar el texto del reto - solo actualizar cuando cambia el periodo
+  useEffect(() => {
+    if (dailyChallenge) {
+      const text = getNonEmptyChallenge(dailyChallenge, selectedCategories);
+      if (text !== "Cargando reto...") {
+        setCurrentChallengeText(text);
+      }
+    }
+  }, [dailyChallenge?.period, dailyChallenge?.categoria_fija]);
+
+  // Usar el estado memorizado
+  const challengeText = currentChallengeText || 
+    (backendLoading ? "Cargando reto..." : "No hay retos disponibles");
   const isStillLoading =
     isLocalLoading ||
     backendLoading ||

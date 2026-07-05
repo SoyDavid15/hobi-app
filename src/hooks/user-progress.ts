@@ -124,14 +124,27 @@ export function useUserProgress() {
 
   const loadDailyChallenge = useCallback(async () => {
     try {
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError || !user) {
+        setLoading(false);
+        return;
+      }
+      
       const timezoneOffset = getUserTimezoneOffset();
+      
+      // Enviar user_id como parámetro obligatorio
       const data = await fetchWithWakeup<DailyChallenge>(
-        `${API_BASE}/retos?user_timezone_offset=${timezoneOffset}`
+        `${API_BASE}/retos?user_timezone_offset=${timezoneOffset}&user_id=${user.id}`
       );
+      
       setDailyChallenge(data);
       setError(null);
     } catch (e: any) {
       console.error("Error al cargar reto diario:", e.message);
+      // El usuario verá "Cargando reto..." hasta que el backend se recupere
+    } finally {
+      setLoading(false);
     }
   }, []);
 

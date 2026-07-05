@@ -59,8 +59,20 @@ export default function LoginScreen() {
       if (error) {
         Alert.alert("Error", error.message);
       } else {
-        Alert.alert("Registro exitoso", "Ya puedes iniciar sesión");
-        setIsLogin(true);
+        // Auto-login after registration and redirect to hobby selector
+        const { error: loginError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        
+        if (loginError) {
+          // If auto-login fails (e.g. email confirmation required), show message
+          Alert.alert("Registro exitoso", "Ya puedes iniciar sesión");
+          setIsLogin(true);
+        } else {
+          // Redirect to hobby selector as onboarding
+          router.replace("/hobby-selector?onboarding=true");
+        }
       }
     }
   }
