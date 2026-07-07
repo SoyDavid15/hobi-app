@@ -36,16 +36,8 @@ const getNonEmptyChallenge = (
 ): string => {
   if (!challenge) return "Cargando reto...";
 
-  const categories = selectedCategories?.length
-    ? selectedCategories.filter((c) => {
-        const value = challenge[c as keyof DailyChallenge];
-        return value && typeof value === "string";
-      })
-    : [];
-
-  if (categories.length > 0) {
-    const pick = categories[Math.floor(Math.random() * categories.length)];
-    return challenge[pick as keyof DailyChallenge] as string;
+  if (challenge.categoria_fija && challenge[challenge.categoria_fija as keyof DailyChallenge]) {
+    return challenge[challenge.categoria_fija as keyof DailyChallenge] as string;
   }
 
   const entries = Object.entries(challenge);

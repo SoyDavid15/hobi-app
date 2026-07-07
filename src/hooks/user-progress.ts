@@ -65,6 +65,8 @@ export interface DailyChallenge {
   Arte: string | null;
   period?: string;
   time_remaining?: number;
+  categoria_fija?: string;
+  mensaje?: string;
 }
 
 export interface UserProgress {

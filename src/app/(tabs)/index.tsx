@@ -2,14 +2,12 @@ import { Redirect } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
 import Home from "@/components/home";
 import { useUserProgress } from "@/hooks/user-progress";
-import { useChallengeNotification } from "../../../notifications";
 import { useAuth } from "@/providers/auth-provider";
 
 export default function HomeScreen() {
   const { session, loading } = useAuth();
 
   const { dailyChallenge } = useUserProgress();
-  useChallengeNotification(dailyChallenge);
 
   if (loading) {
     return (

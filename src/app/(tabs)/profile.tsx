@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Pressable, ScrollView, StyleSheet, View, ActivityIndicator } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View, ActivityIndicator, Modal, TouchableOpacity } from 'react-native';
 import { Image } from 'expo-image';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -22,6 +22,7 @@ export default function ProfileScreen() {
   
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<{ url: string; reto: string; fecha: string } | null>(null);
 
   useEffect(() => {
     async function loadUser() {
@@ -48,14 +49,14 @@ export default function ProfileScreen() {
       <ScrollView
         style={styles.scrollView}
         contentInset={insets}
-        contentContainerStyle={[styles.contentContainer, { paddingTop: insets.top || Spacing.six }]}
+        contentContainerStyle={[styles.contentContainer, { paddingTop: insets.top || Spacing.three }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.innerContainer}>
           
           <View style={styles.headerContainer}>
             <Pressable style={styles.menuButton} onPress={() => router.push('/settings')}>
-              <Ionicons name="settings-outline" size={26} color={theme.text} />
+              <Ionicons name="settings-outline" size={20} color={theme.text} />
             </Pressable>
             
             <View style={styles.profileContent}>
@@ -72,71 +73,69 @@ export default function ProfileScreen() {
           </View>
 
           <View style={styles.statsContainer}>
-            <View style={[styles.statCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-              <View style={[styles.iconWrapper, { backgroundColor: '#FFF0F0' }]}>
-                <Ionicons name="flame" size={26} color="#FF6B6B" />
+            <View style={styles.statCard}>
+              <View style={styles.statContent}>
+                <Ionicons name="flame" size={20} color="#FF6B6B" />
+                <ThemedText type="subtitle" style={styles.statValue}>
+                  {progress?.streak ?? 0}
+                </ThemedText>
               </View>
-              <ThemedText type="subtitle" style={styles.statValue}>
-                {progress?.streak ?? 0}
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.statLabel}>
-                Días de Racha
+              <ThemedText type="small" themeColor="textSecondary">
+                Racha
               </ThemedText>
             </View>
 
-            <View style={[styles.statCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-              <View style={[styles.iconWrapper, { backgroundColor: '#EAFCEB' }]}>
-                <Ionicons name="checkmark-circle" size={26} color="#4CAF50" />
+            <View style={styles.statCard}>
+              <View style={styles.statContent}>
+                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                <ThemedText type="subtitle" style={styles.statValue}>
+                  {progress?.completedChallenges ?? 0}
+                </ThemedText>
               </View>
-              <ThemedText type="subtitle" style={styles.statValue}>
-                {progress?.completedChallenges ?? 0}
-              </ThemedText>
-              <ThemedText type="small" themeColor="textSecondary" style={styles.statLabel}>
-                Retos Hechos
+              <ThemedText type="small" themeColor="textSecondary">
+                Completados
               </ThemedText>
             </View>
           </View>
 
-          <View style={[styles.motivationContainer, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-            <ThemedText type="defaultSemiBold" style={styles.motivationTitle}>
-              ¡Sigue así, {username || 'Hobi'}!
-            </ThemedText>
-            <ThemedText themeColor="textSecondary" style={styles.motivationText}>
-              Completar retos diarios te ayuda a descubrir nuevos pasatiempos y mejorar tu bienestar. 
-              Vuelve mañana para continuar tu racha de {progress?.streak ?? 0} días.
+          <View style={styles.motivationContainer}>
+            <ThemedText type="defaultSemiBold" style={styles.motivationText}>
+              ¡Sigue así! {progress?.streak ?? 0} días de racha 🔥
             </ThemedText>
           </View>
 
-          <View style={[styles.galleryContainer, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+          <View style={styles.galleryContainer}>
             <ThemedText type="defaultSemiBold" style={styles.galleryTitle}>
-              Tus Retos Completados
+              Retos Completados
             </ThemedText>
 
             {photosLoading ? (
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={theme.textSecondary} />
-                <ThemedText themeColor="textSecondary" style={styles.loadingText}>
-                  Cargando fotos...
-                </ThemedText>
               </View>
             ) : photosError ? (
               <View style={styles.errorContainer}>
-                <Ionicons name="cloud-offline-outline" size={48} color={theme.textSecondary} />
+                <Ionicons name="cloud-offline-outline" size={40} color={theme.textSecondary} />
                 <ThemedText themeColor="textSecondary" style={styles.errorText}>
                   {photosError}
                 </ThemedText>
               </View>
             ) : photos.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Ionicons name="camera-outline" size={48} color={theme.textSecondary} />
+                <Ionicons name="camera-outline" size={40} color={theme.textSecondary} />
                 <ThemedText themeColor="textSecondary" style={styles.emptyText}>
-                  Aún no has completado ningún reto. ¡Empieza hoy!
+                  Completa tu primer reto
                 </ThemedText>
               </View>
             ) : (
               <View style={styles.photosList}>
                 {photos.map((photo, index) => (
-                  <View key={index} style={[styles.photoCard, { borderColor: theme.border }]}>
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.photoCard}
+                    activeOpacity={0.85}
+                    onPress={() => setSelectedPhoto({ url: photo.url, reto: photo.reto, fecha: photo.fecha })}
+                  >
                     <Image
                       source={{ uri: photo.url }}
                       style={styles.photoImage}
@@ -147,11 +146,8 @@ export default function ProfileScreen() {
                       <ThemedText type="defaultSemiBold" style={styles.photoReto}>
                         {photo.reto}
                       </ThemedText>
-                      <ThemedText themeColor="textSecondary" style={styles.photoFecha}>
-                        {formatDate(photo.fecha)}
-                      </ThemedText>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </View>
             )}
@@ -159,41 +155,73 @@ export default function ProfileScreen() {
 
         </View>
       </ScrollView>
+
+      <Modal
+        visible={!!selectedPhoto}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setSelectedPhoto(null)}
+      >
+        <View style={styles.modalContainer}>
+          <Pressable style={styles.modalClose} onPress={() => setSelectedPhoto(null)}>
+            <Ionicons name="close" size={32} color="#fff" />
+          </Pressable>
+          {selectedPhoto && (
+            <>
+              <Image
+                source={{ uri: selectedPhoto.url }}
+                style={styles.modalImage}
+                contentFit="contain"
+              />
+              <View style={styles.modalInfo}>
+                <ThemedText type="defaultSemiBold" style={styles.modalReto}>
+                  {selectedPhoto.reto}
+                </ThemedText>
+                <ThemedText themeColor="textSecondary" style={styles.modalFecha}>
+                  {formatDate(selectedPhoto.fecha)}
+                </ThemedText>
+              </View>
+            </>
+          )}
+        </View>
+      </Modal>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   scrollView: { flex: 1 },
-  contentContainer: { flexDirection: 'row', justifyContent: 'center', paddingBottom: Spacing.six },
+  contentContainer: { flexDirection: 'row', justifyContent: 'center', paddingBottom: Spacing.four },
   container: { flex: 1 },
-  innerContainer: { maxWidth: MaxContentWidth, flexGrow: 1, paddingHorizontal: Spacing.five },
-  headerContainer: { alignItems: 'center', marginBottom: Spacing.five, marginTop: Spacing.two, position: 'relative', paddingTop: Spacing.two },
+  innerContainer: { maxWidth: MaxContentWidth, flexGrow: 1, paddingHorizontal: Spacing.three },
+  headerContainer: { alignItems: 'center', marginBottom: Spacing.three, marginTop: Spacing.one, position: 'relative' },
   menuButton: { position: 'absolute', top: 0, right: 0, padding: Spacing.two, zIndex: 10 },
-  profileContent: { alignItems: 'center', marginTop: Spacing.four },
-  avatarContainer: { width: 130, height: 130, borderRadius: 65, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.four, overflow: 'hidden', borderWidth: 4, borderColor: '#0055DA20' },
-  username: { fontSize: 26, fontWeight: '700', marginBottom: Spacing.one },
-  email: { fontSize: 14, opacity: 0.8 },
-  statsContainer: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.four, marginBottom: Spacing.five },
-  statCard: { flex: 1, paddingVertical: Spacing.five, paddingHorizontal: Spacing.four, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1, elevation: 2 },
-  iconWrapper: { padding: Spacing.two, borderRadius: 14, marginBottom: Spacing.two },
-  statValue: { fontSize: 28, fontWeight: 'bold', marginBottom: Spacing.one },
-  statLabel: { fontSize: 13, textAlign: 'center' },
-  motivationContainer: { padding: Spacing.five, borderRadius: 20, borderWidth: 1 },
-  motivationTitle: { fontSize: 18, marginBottom: Spacing.two, color: '#0055DA' },
-  motivationText: { lineHeight: 22, fontSize: 14 },
-  galleryContainer: { padding: Spacing.five, borderRadius: 20, borderWidth: 1, marginTop: Spacing.five },
-  galleryTitle: { fontSize: 18, marginBottom: Spacing.four, color: '#0055DA', textAlign: 'center' },
+  profileContent: { alignItems: 'center' },
+  avatarContainer: { width: 80, height: 80, borderRadius: 40, justifyContent: 'center', alignItems: 'center', marginBottom: Spacing.two, overflow: 'hidden' },
+  username: { fontSize: 20, fontWeight: '700', marginBottom: Spacing.half },
+  email: { fontSize: 13, opacity: 0.7 },
+  statsContainer: { flexDirection: 'row', justifyContent: 'space-between', gap: Spacing.three, marginBottom: Spacing.three },
+  statCard: { flex: 1, padding: Spacing.three, alignItems: 'center' },
+  statContent: { flexDirection: 'row', alignItems: 'center', gap: Spacing.two, marginBottom: Spacing.half },
+  statValue: { fontSize: 20, fontWeight: 'bold' },
+  motivationContainer: { paddingVertical: Spacing.three, paddingHorizontal: Spacing.three, marginBottom: Spacing.three, borderRadius: 16 },
+  motivationText: { fontSize: 14, textAlign: 'center' },
+  galleryContainer: { padding: Spacing.three, borderRadius: 16 },
+  galleryTitle: { fontSize: 16, marginBottom: Spacing.three, textAlign: 'center' },
   loadingContainer: { alignItems: 'center', paddingVertical: Spacing.four },
-  loadingText: { marginTop: Spacing.two, fontSize: 14 },
   errorContainer: { alignItems: 'center', paddingVertical: Spacing.four },
-  errorText: { marginTop: Spacing.two, fontSize: 14, textAlign: 'center' },
+  errorText: { marginTop: Spacing.two, fontSize: 13, textAlign: 'center' },
   emptyContainer: { alignItems: 'center', paddingVertical: Spacing.four },
-  emptyText: { marginTop: Spacing.two, fontSize: 14, textAlign: 'center' },
+  emptyText: { marginTop: Spacing.two, fontSize: 13, textAlign: 'center' },
   photosList: { gap: Spacing.three },
-  photoCard: { borderWidth: 1, borderRadius: 16, overflow: 'hidden' },
-  photoImage: { width: '100%', height: 200 },
-  photoInfo: { padding: Spacing.three },
-  photoReto: { fontSize: 15, marginBottom: Spacing.half },
-  photoFecha: { fontSize: 13 },
+  photoCard: { borderRadius: 12, overflow: 'hidden' },
+  photoImage: { width: '100%', height: 320 },
+  photoInfo: { padding: Spacing.three, paddingTop: Spacing.two },
+  photoReto: { fontSize: 15, fontWeight: '600' },
+  modalContainer: { flex: 1, backgroundColor: '#000', justifyContent: 'center', alignItems: 'center' },
+  modalClose: { position: 'absolute', top: 50, right: 20, zIndex: 10, padding: Spacing.two },
+  modalImage: { width: '100%', height: '80%' },
+  modalInfo: { position: 'absolute', bottom: 40, left: 0, right: 0, paddingHorizontal: Spacing.four, alignItems: 'center' },
+  modalReto: { fontSize: 18, color: '#fff', marginBottom: Spacing.one },
+  modalFecha: { fontSize: 14, color: '#aaa' },
 });

@@ -26,6 +26,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-updates",
       [
         "expo-splash-screen",
         {
@@ -41,6 +42,14 @@
         {
           "cameraPermission": "Necesitamos acceso a tu cámara para subir el reto."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/hobiIcon.png",
+          "color": "#208AEF",
+          "sounds": []
+        }
       ]
     ],
     "experiments": {
@@ -54,6 +63,10 @@
       "eas": {
         "projectId": "90828f64-beab-400c-8c86-ea81613744ff"
       }
-    }
+    },
+    "updates": {
+      "url": "https://u.expo.dev/90828f64-beab-400c-8c86-ea81613744ff"
+    },
+    "runtimeVersion": "1.0.0"
   }
 }

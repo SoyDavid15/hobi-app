@@ -22,52 +22,66 @@ if (!isExpoGo) {
   }
 }
 
-export function useChallengeNotification(challenge: any) {
-  useEffect(() => {
-    // Si estás en Expo Go, salimos silenciosamente para que puedas seguir desarrollando
-    if (isExpoGo || !challenge || !Notifications) {
-      if (isExpoGo && challenge) {
-        console.warn("⚠️ Notificaciones omitidas: Expo Go SDK 53+ no las soporta de manera nativa.");
-      }
-      return;
-    }
+export async function scheduleDailyChallengeNotifications() {
+  if (isExpoGo || !Notifications) {
+    console.log("Notificaciones no disponibles en este entorno");
+    return;
+  }
 
-    const checkAndNotify = async () => {
-      // 1. VERIFICACIÓN DE PREFERENCIA: Leemos el estado del Switch de configuración
-      const isEnabledSetting = await AsyncStorage.getItem('@hobi-notifications-enabled');
-      
-      // Si el usuario las apagó explícitamente, cancelamos la ejecución
-      if (isEnabledSetting === 'false') {
-        return; 
-      }
+  await Notifications.cancelAllScheduledNotificationsAsync();
 
-      const currentChallengeString = JSON.stringify(challenge);
-      const lastNotified = await AsyncStorage.getItem('lastNotifiedChallenge');
+  const isEnabled = await AsyncStorage.getItem('@hobi-notifications-enabled');
+  if (isEnabled === 'false') {
+    return;
+  }
 
-      if (lastNotified !== currentChallengeString) {
-        const { status } = await Notifications.requestPermissionsAsync();
-        
-        if (status === 'granted') {
-          if (Platform.OS === 'android') {
-            await Notifications.setNotificationChannelAsync('default', {
-              name: 'default',
-              importance: Notifications.AndroidImportance.MAX,
-            });
-          }
+  const { status } = await Notifications.requestPermissionsAsync();
+  if (status !== 'granted') {
+    return;
+  }
 
-          await Notifications.scheduleNotificationAsync({
-            content: {
-              title: "¡Nuevo reto disponible! 🚀",
-              body: "No dejes que se enfríe tu racha!",
-            },
-            trigger: null,
-          });
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+    });
+  }
 
-          await AsyncStorage.setItem('lastNotifiedChallenge', currentChallengeString);
-        }
-      }
-    };
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: "¡Nuevo día, nuevos retos! 🚀",
+      body: "Tu reto de la mañana ya está disponible",
+      sound: true,
+    },
+    trigger: {
+      hour: 0,
+      minute: 0,
+      repeats: true,
+    },
+  });
 
-    checkAndNotify();
-  }, [challenge]);
+  await Notifications.scheduleNotificationAsync({
+    content: {
+      title: "¡Reto de la tarde! 🌅",
+      body: "No dejes que se enfríe tu racha",
+      sound: true,
+    },
+    trigger: {
+      hour: 12,
+      minute: 0,
+      repeats: true,
+    },
+  });
+}
+
+export async function updateNotificationSchedule(enabled: boolean) {
+  if (isExpoGo || !Notifications) return;
+  
+  await AsyncStorage.setItem('@hobi-notifications-enabled', enabled ? 'true' : 'false');
+  
+  if (enabled) {
+    await scheduleDailyChallengeNotifications();
+  } else {
+    await Notifications.cancelAllScheduledNotificationsAsync();
+  }
 }

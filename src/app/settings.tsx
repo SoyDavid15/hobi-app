@@ -11,7 +11,8 @@ import { useTheme, triggerThemeChange } from '@/hooks/use-theme';
 import { supabase } from '../../supabaseClient';
 
 const THEME_KEY = '@hobi-theme';
-const NOTIFICATIONS_KEY = '@hobi-notifications-enabled'; // Nueva clave para persistencia
+const NOTIFICATIONS_KEY = '@hobi-notifications-enabled';
+import { updateNotificationSchedule } from '../../notifications';
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -49,7 +50,7 @@ export default function SettingsScreen() {
   // Nueva función para alternar las notificaciones
   const toggleNotifications = (value: boolean) => {
     setNotificationsEnabled(value);
-    AsyncStorage.setItem(NOTIFICATIONS_KEY, String(value));
+    updateNotificationSchedule(value);
   };
 
   return (
