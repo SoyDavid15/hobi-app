@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, View, Switch } from 'react-native';
+import { Pressable, StyleSheet, View, Switch, Alert } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -12,6 +12,7 @@ import { supabase } from '../../supabaseClient';
 
 const THEME_KEY = '@hobi-theme';
 const NOTIFICATIONS_KEY = '@hobi-notifications-enabled';
+const API_BASE = "https://hobi-backend-yjzs.onrender.com";
 import { updateNotificationSchedule } from '../../notifications';
 
 export default function SettingsScreen() {
@@ -123,10 +124,57 @@ export default function SettingsScreen() {
               router.replace('/login');
             }}
           >
-            <Ionicons name="log-out-outline" size={22} color="#FF6B6B" />
-            <ThemedText style={[styles.settingLabel, { color: '#FF6B6B' }]}>Cerrar sesión</ThemedText>
-          </Pressable>
-        </ThemedView>
+              <Ionicons name="log-out-outline" size={22} color="#FF6B6B" />
+              <ThemedText style={[styles.settingLabel, { color: '#FF6B6B' }]}>Cerrar sesión</ThemedText>
+            </Pressable>
+          </ThemedView>
+
+          <ThemedView type="backgroundElement" style={styles.section}>
+            <Pressable
+              style={styles.settingItem}
+              onPress={() => {
+                Alert.alert(
+                  "Eliminar cuenta",
+                  "Esta acción es irreversible. Se borrarán todos tus datos, fotos, progreso y tu cuenta de acceso. ¿Estás completamente seguro?",
+                  [
+                    { text: "Cancelar", style: "cancel" },
+                    { 
+                      text: "Eliminar",
+                      style: "destructive",
+                      onPress: async () => {
+                        try {
+                          const { data: { user } } = await supabase.auth.getUser();
+                          const { data: { session } } = await supabase.auth.getSession();
+                          if (!user) { Alert.alert("Error", "No se pudo obtener el usuario"); return; }
+                          
+                          const response = await fetch(`${API_BASE}/usuarios/${user.id}`, {
+                            method: 'DELETE',
+                            headers: {
+                              'Authorization': `Bearer ${session?.access_token}`,
+                            },
+                          });
+                          
+                          if (!response.ok) {
+                            const errorData = await response.json().catch(() => ({ detail: "Error desconocido" }));
+                            Alert.alert("Error", errorData.detail || "No se pudo eliminar la cuenta");
+                            return;
+                          }
+                          
+                          await supabase.auth.signOut();
+                          router.replace('/login');
+                        } catch (err: any) {
+                          Alert.alert("Error", err.message || "Error al eliminar la cuenta");
+                        }
+                      }
+                    },
+                  ]
+                );
+              }}
+            >
+              <Ionicons name="trash-outline" size={22} color="#FF6B6B" />
+              <ThemedText style={[styles.settingLabel, { color: '#FF6B6B' }]}>Eliminar cuenta</ThemedText>
+            </Pressable>
+          </ThemedView>
       </View>
     </ThemedView>
   );

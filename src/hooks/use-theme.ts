@@ -29,14 +29,24 @@ export function useTheme() {
   const [, forceUpdate] = useState(0);
 
   useEffect(() => {
+    const listener = () => forceUpdate((n) => n + 1);
+    listeners.push(listener);
+
+    if (cachedSavedTheme !== null) {
+      // Tema ya cargado por otra instancia: saltamos AsyncStorage
+      return () => {
+        const idx = listeners.indexOf(listener);
+        if (idx > -1) listeners.splice(idx, 1);
+      };
+    }
+
+    // Primera instancia: leer de AsyncStorage y llenar caché
     AsyncStorage.getItem(THEME_KEY).then((saved) => {
       if (saved === 'light' || saved === 'dark') {
         cachedSavedTheme = saved;
+        forceUpdate((n) => n + 1);
       }
     });
-
-    const listener = () => forceUpdate((n) => n + 1);
-    listeners.push(listener);
 
     return () => {
       const idx = listeners.indexOf(listener);
