@@ -1,16 +1,10 @@
-import { useEffect } from 'react';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from "expo-router";
 import { useColorScheme } from "react-native";
 import { AnimatedSplashOverlay } from "@/components/animated-icon";
 import { AuthProvider } from "@/providers/auth-provider";
-import { scheduleDailyChallengeNotifications } from '../../notifications';
 
 export default function RootLayout() {
   const colorScheme = useColorScheme();
-
-  useEffect(() => {
-    scheduleDailyChallengeNotifications();
-  }, []);
 
   return (
     <AuthProvider>

@@ -6,19 +6,18 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal",
-      "updates": { "autoCreate": true }
+      "distribution": "internal"
     },
     "preview": {
       "distribution": "internal",
-      "updates": { "autoCreate": true },
+      "channel": "preview",
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
       "autoIncrement": true,
-      "updates": { "autoCreate": true },
+      "channel": "production",
       "android": {
         "buildType": "apk"
       }

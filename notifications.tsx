@@ -1,4 +1,3 @@
-import { useEffect } from 'react';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
@@ -24,19 +23,23 @@ if (!isExpoGo) {
 
 export async function scheduleDailyChallengeNotifications() {
   if (isExpoGo || !Notifications) {
-    console.log("Notificaciones no disponibles en este entorno");
+    console.log("[HobiNotif] Notificaciones no disponibles en este entorno");
     return;
   }
 
   await Notifications.cancelAllScheduledNotificationsAsync();
 
   const isEnabled = await AsyncStorage.getItem('@hobi-notifications-enabled');
+  console.log("[HobiNotif] Estado de notificaciones en storage:", isEnabled);
   if (isEnabled === 'false') {
+    console.log("[HobiNotif] Notificaciones desactivadas por el usuario");
     return;
   }
 
   const { status } = await Notifications.requestPermissionsAsync();
+  console.log("[HobiNotif] Estado de permisos:", status);
   if (status !== 'granted') {
+    console.log("[HobiNotif] Permisos no concedidos, no se programan notificaciones");
     return;
   }
 
@@ -59,6 +62,7 @@ export async function scheduleDailyChallengeNotifications() {
       repeats: true,
     },
   });
+  console.log("[HobiNotif] Notificación medianoche (00:00) programada");
 
   await Notifications.scheduleNotificationAsync({
     content: {
@@ -72,16 +76,21 @@ export async function scheduleDailyChallengeNotifications() {
       repeats: true,
     },
   });
+  console.log("[HobiNotif] Notificación mediodía (12:00) programada");
+
+  console.log("[HobiNotif] Todas las notificaciones programadas correctamente");
 }
 
 export async function updateNotificationSchedule(enabled: boolean) {
   if (isExpoGo || !Notifications) return;
   
+  console.log("[HobiNotif] Actualizando preferencia de notificaciones:", enabled);
   await AsyncStorage.setItem('@hobi-notifications-enabled', enabled ? 'true' : 'false');
   
   if (enabled) {
     await scheduleDailyChallengeNotifications();
   } else {
     await Notifications.cancelAllScheduledNotificationsAsync();
+    console.log("[HobiNotif] Notificaciones canceladas por el usuario");
   }
 }

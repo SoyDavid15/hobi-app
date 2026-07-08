@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { StyleSheet, ScrollView, View } from "react-native";
+import { StyleSheet, ScrollView, View, AppState } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "expo-router";
 
@@ -7,6 +7,7 @@ import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { ChallengeCard } from "@/components/challenge-card";
 import { useAuth } from "@/providers/auth-provider";
+import { scheduleDailyChallengeNotifications } from "../../notifications";
 
 const SELECTED_HOBBIES_KEY = "@hobi-selected-hobbies";
 
@@ -26,6 +27,24 @@ const Home = () => {
       mountedRef.current = false;
     };
   }, [session, signOut]);
+
+  useEffect(() => {
+    if (session) {
+      scheduleDailyChallengeNotifications();
+    }
+  }, [session]);
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      if (nextAppState === 'active') {
+        scheduleDailyChallengeNotifications();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
