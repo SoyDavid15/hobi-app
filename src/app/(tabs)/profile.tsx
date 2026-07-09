@@ -22,7 +22,7 @@ export default function ProfileScreen() {
   
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
-  const [selectedPhoto, setSelectedPhoto] = useState<{ url: string; reto: string; fecha: string } | null>(null);
+  const [selectedPhoto, setSelectedPhoto] = useState<{ url: string; reto: string; fecha: string | null } | null>(null);
 
   useEffect(() => {
     async function loadUser() {
@@ -100,13 +100,13 @@ export default function ProfileScreen() {
 
           <View style={styles.motivationContainer}>
             <ThemedText type="defaultSemiBold" style={styles.motivationText}>
-              ¡Sigue así! {progress?.streak ?? 0} días de racha 🔥
+              ¡Sigue así! {progress?.streak ?? 0} días de racha
             </ThemedText>
           </View>
 
           <View style={styles.galleryContainer}>
             <ThemedText type="defaultSemiBold" style={styles.galleryTitle}>
-              Retos Completados
+              Mi galeria de retos
             </ThemedText>
 
             {photosLoading ? (

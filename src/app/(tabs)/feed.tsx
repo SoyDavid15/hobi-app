@@ -4,7 +4,7 @@ export default function FeedScreen() {
   return (
     <View style={styles.container}>
       <Text style={styles.text}>Estamos trabajando en esto...</Text>
-      <Text style={styles.text}>¡ten paciencia!</Text>
+      <Text style={styles.text}>¡Muy pronto!</Text>
     </View>
   );
 }

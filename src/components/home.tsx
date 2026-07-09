@@ -9,6 +9,8 @@ import { ChallengeCard } from "@/components/challenge-card";
 import { useAuth } from "@/providers/auth-provider";
 import { scheduleDailyChallengeNotifications } from "../../notifications";
 
+const API_URL = "https://hobi-backend-yjzs.onrender.com";
+
 const SELECTED_HOBBIES_KEY = "@hobi-selected-hobbies";
 
 const Home = () => {
@@ -62,7 +64,25 @@ const Home = () => {
           }
         }
       });
-    }, [])
+
+      AsyncStorage.getItem("@hobi-pending-sync").then(async (pendingSync) => {
+        if (pendingSync && session?.user) {
+          try {
+            const hobbies = JSON.parse(pendingSync);
+            const formData = new FormData();
+            formData.append("user_id", session.user.id);
+            formData.append("hobbies", JSON.stringify(hobbies));
+            const response = await fetch(`${API_URL}/usuarios/hobbies`, {
+              method: "POST",
+              body: formData,
+            });
+            if (response.ok) {
+              await AsyncStorage.removeItem("@hobi-pending-sync");
+            }
+          } catch {}
+        }
+      });
+    }, [session])
   );
 
   return (

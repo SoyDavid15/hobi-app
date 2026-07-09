@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
@@ -179,7 +180,11 @@ export default function HobbySelectorScreen() {
     );
     
     if (!savedToBackend) {
-      console.log('📱 Hobbies guardados localmente (se sincronizarán después)');
+      await AsyncStorage.setItem("@hobi-pending-sync", JSON.stringify(selectedKeys));
+      Alert.alert(
+        "Guardado local",
+        "Tus hobbies se guardaron en el dispositivo. Se sincronizarán con el servidor automáticamente cuando haya conexión."
+      );
     }
 
     // 3. Navegar (siempre)
