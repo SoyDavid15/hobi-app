@@ -37,6 +37,9 @@ yarn-error.*
 # typescript
 *.tsbuildinfo
 
+secrets-to-scrub.txt
+SCRUB-GIT-HISTORY.ps1
+
 example
 
 # generated native folders
