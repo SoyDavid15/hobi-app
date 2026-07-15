@@ -1,9 +1,29 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "../../supabaseClient";
+import { useProgress } from "@/context/progress-provider";
 
+export interface DailyChallenge {
+  Musica: string | null;
+  Lectura: string | null;
+  Cine_y_Television: string | null;
+  Videojuegos: string | null;
+  Comida: string | null;
+  Deporte: string | null;
+  Salir: string | null;
+  Arte: string | null;
+  period?: string;
+  time_remaining?: number;
+  categoria_fija?: string;
+  mensaje?: string;
+}
+
+export interface UserProgress {
+  completedChallenges: number;
+  streak: number;
+  lastCompletedDate: string | null;
+}
 
 const API_BASE = "https://hobi-backend-yjzs.onrender.com";
-
 const INITIAL_TIMEOUT = 20000;
 const RETRY_COUNT = 2;
 const RETRY_DELAY_BASE = 2000;
@@ -50,132 +70,8 @@ const fetchWithWakeup = async <T,>(
   throw new Error("fetchWithWakeup: unexpected end of retries");
 };
 
-const getUserTimezoneOffset = (): number => {
-  return -new Date().getTimezoneOffset() / 60;
-};
-
-export interface DailyChallenge {
-  Musica: string | null;
-  Lectura: string | null;
-  Cine_y_Television: string | null;
-  Videojuegos: string | null;
-  Comida: string | null;
-  Deporte: string | null;
-  Salir: string | null;
-  Arte: string | null;
-  period?: string;
-  time_remaining?: number;
-  categoria_fija?: string;
-  mensaje?: string;
-}
-
-export interface UserProgress {
-  completedChallenges: number;
-  streak: number;
-  lastCompletedDate: string | null;
-}
-
-const DEFAULT_PROGRESS: UserProgress = {
-  completedChallenges: 0,
-  streak: 0,
-  lastCompletedDate: null,
-};
-
-const KEEPALIVE_INTERVAL = 10 * 60 * 1000;
-
 export function useUserProgress() {
-  const [progress, setProgress] = useState<UserProgress>(DEFAULT_PROGRESS);
-  const [loading, setLoading] = useState(true);
-  const [dailyChallenge, setDailyChallenge] = useState<DailyChallenge | null>(
-    null
-  );
-  const [error, setError] = useState<string | null>(null);
-  const keepAliveRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const loadProgress = useCallback(async () => {
-    try {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      if (!user) {
-        setLoading(false);
-        return;
-      }
-
-      const data = await fetchWithWakeup<any>(
-        `${API_BASE}/progreso/${user.id}`
-      );
-
-      setProgress({
-        completedChallenges: data.completed_challenges || 0,
-        streak: data.streak || 0,
-        lastCompletedDate: data.last_completed_date || null,
-      });
-      setError(null);
-    } catch (e: any) {
-      const msg =
-        e.code === "ECONNABORTED"
-          ? "El servidor está arrancando. Intenta de nuevo en unos segundos."
-          : "Error al cargar progreso. Verifica tu conexión.";
-      console.error("Error al cargar progreso del backend:", e.message);
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  const loadDailyChallenge = useCallback(async () => {
-    try {
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      
-      if (authError || !user) {
-        setLoading(false);
-        return;
-      }
-      
-      const timezoneOffset = getUserTimezoneOffset();
-      
-      // Enviar user_id como parámetro obligatorio
-      const data = await fetchWithWakeup<DailyChallenge>(
-        `${API_BASE}/retos?user_timezone_offset=${timezoneOffset}&user_id=${user.id}`
-      );
-      
-      setDailyChallenge(data);
-      setError(null);
-    } catch (e: any) {
-      console.error("Error al cargar reto diario:", e.message);
-      // El usuario verá "Cargando reto..." hasta que el backend se recupere
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadProgress();
-    loadDailyChallenge();
-
-    keepAliveRef.current = setInterval(() => {
-      fetch(`${API_BASE}/retos`, {
-        headers: { Accept: "application/json" },
-      }).catch(() => {});
-    }, KEEPALIVE_INTERVAL);
-
-    return () => {
-      if (keepAliveRef.current) {
-        clearInterval(keepAliveRef.current);
-        keepAliveRef.current = null;
-      }
-    };
-  }, [loadProgress, loadDailyChallenge]);
-
-  return {
-    progress,
-    loading,
-    error,
-    refreshProgress: loadProgress,
-    dailyChallenge,
-    refreshDailyChallenge: loadDailyChallenge,
-  };
+  return useProgress();
 }
 
 export interface UserPhoto {

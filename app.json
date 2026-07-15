@@ -27,6 +27,7 @@
     "plugins": [
       "expo-router",
       "expo-updates",
+      "expo-secure-store",
       [
         "expo-splash-screen",
         {
@@ -63,8 +64,13 @@
       }
     },
     "updates": {
-      "url": "https://u.expo.dev/90828f64-beab-400c-8c86-ea81613744ff"
+      "url": "https://u.expo.dev/90828f64-beab-400c-8c86-ea81613744ff",
+      "requestHeaders": {
+        "expo-channel": "production"
+      }
     },
-    "runtimeVersion": "1.0.0"
+    "runtimeVersion": {
+      "policy": "appVersion"
+    }
   }
 }

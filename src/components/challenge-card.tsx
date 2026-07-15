@@ -1,4 +1,3 @@
-import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { useUserProgress, DailyChallenge } from "@/hooks/user-progress";
 import { useState, useEffect, useRef } from "react";
@@ -14,10 +13,22 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { HobiCharacter } from "./hobi-character";
 import { useTheme } from "@/hooks/use-theme";
 import { useAuth } from "@/providers/auth-provider";
+import { isAllowedMimeType } from "@/utils/challenge";
 import * as ImagePicker from "expo-image-picker";
 
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024;
+const ALLOWED_EXTENSIONS = /\.(jpe?g|png|webp|heic)$/i;
 
 const API_URL = "https://hobi-backend-yjzs.onrender.com";
+
+const sanitizeFilename = (raw: string): string => {
+  const stripped = raw
+    .replace(/[/\\]/g, '_')
+    .replace(/\.\./g, '')
+    .replace(/[\x00-\x1f\x7f]/g, '');
+  if (!stripped || stripped.length < 2) return 'reto.jpg';
+  return ALLOWED_EXTENSIONS.test(stripped) ? stripped : `${stripped}.jpg`;
+};
 
 const uriToBlob = async (uri: string): Promise<Blob> => {
   return new Promise((resolve, reject) => {
@@ -125,6 +136,7 @@ export function ChallengeCard({ selectedCategories }: ChallengeCardProps) {
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [blockedUntilNext, setBlockedUntilNext] = useState<boolean>(false);
   const [currentChallengeText, setCurrentChallengeText] = useState<string>("");
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const {
     loading: backendLoading,
@@ -181,6 +193,11 @@ export function ChallengeCard({ selectedCategories }: ChallengeCardProps) {
   }, [currentPeriod]);
 
   useEffect(() => {
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+
     if (dailyChallenge?.time_remaining) {
       setTimeRemaining(dailyChallenge.time_remaining);
 
@@ -188,6 +205,7 @@ export function ChallengeCard({ selectedCategories }: ChallengeCardProps) {
         setTimeRemaining((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
+            countdownTimerRef.current = null;
             refreshDailyChallenge();
             return 0;
           }
@@ -195,8 +213,15 @@ export function ChallengeCard({ selectedCategories }: ChallengeCardProps) {
         });
       }, 1000);
 
-      return () => clearInterval(timer);
+      countdownTimerRef.current = timer;
     }
+
+    return () => {
+      if (countdownTimerRef.current) {
+        clearInterval(countdownTimerRef.current);
+        countdownTimerRef.current = null;
+      }
+    };
   }, [dailyChallenge?.time_remaining, refreshDailyChallenge]);
 
   const completed = (() => {
@@ -271,30 +296,39 @@ export function ChallengeCard({ selectedCategories }: ChallengeCardProps) {
       }
 
       const asset = result.assets[0];
+
+      const mimeType = (asset.mimeType || 'image/jpeg').toLowerCase();
+      if (!isAllowedMimeType(mimeType)) {
+        Alert.alert(
+          "Formato no soportado",
+          "Solo se permiten imágenes JPEG o PNG."
+        );
+        setIsMarking(false);
+        setUploadStatus("idle");
+        return;
+      }
+
+      const fileBlob = await uriToBlob(asset.uri);
+      if (fileBlob.size > MAX_IMAGE_SIZE) {
+        Alert.alert(
+          "Imagen demasiado grande",
+          "La foto debe ser menor a 5 MB. Intenta con una resolución más baja."
+        );
+        setIsMarking(false);
+        setUploadStatus("idle");
+        return;
+      }
+
       const formData = new FormData();
       formData.append("user_id", String(session.user.id));
       formData.append("reto_texto", challengeText);
       formData.append("period", currentPeriod);
       formData.append("user_timezone_offset", String(getUserTimezoneOffset()));
 
-      const fileName =
-        asset.fileName || asset.uri.split("/").pop() || "reto.jpg";
-      const mimeType = asset.mimeType || "image/jpeg";
+      const rawName = asset.fileName || asset.uri.split("/").pop() || "reto.jpg";
+      const fileName = sanitizeFilename(rawName);
 
-      try {
-        const fileBlob = await uriToBlob(asset.uri);
-        formData.append("file", fileBlob, fileName);
-      } catch (blobError) {
-        console.error("Error al convertir la imagen:", blobError);
-        setIsMarking(false);
-        setUploadStatus("error");
-        Alert.alert(
-          "Error",
-          "No se pudo leer la imagen capturada. Intenta tomar otra foto."
-        );
-        return;
-      }
-
+      formData.append("file", fileBlob, fileName);
       setUploadStatus("uploading");
       try {
         const response = await fetch(`${API_URL}/retos/realizado`, {
@@ -392,26 +426,39 @@ export function ChallengeCard({ selectedCategories }: ChallengeCardProps) {
     );
   };
 
+  const isDark = theme.background === "#000000";
+
   return (
-    <ThemedView style={styles.card}>
-      <HobiCharacter />
+    <View style={styles.card}>
+      <HobiCharacter size={200} />
       <View style={styles.infoContainer}>
-        <View
-          style={[
-            styles.badge,
-            { backgroundColor: theme.backgroundElement },
-          ]}
-        >
-          <ThemedText style={styles.badgeText}>
+        {/* Badge del periodo */}
+        <View style={[
+          styles.badge,
+          {
+            backgroundColor: isDark ? "rgba(255,159,67,0.15)" : "rgba(255,159,67,0.12)",
+            borderColor: isDark ? "rgba(255,159,67,0.35)" : "rgba(255,159,67,0.25)",
+          }
+        ]}>
+          <ThemedText style={[styles.badgeText, { color: "#FF9F43" }]}>
             {getPeriodTitle(dailyChallenge?.period)}
           </ThemedText>
         </View>
+
         <ThemedText style={styles.challengeTitle} type="defaultSemiBold">
           {challengeText}
         </ThemedText>
+
+        {/* Countdown */}
         <View style={styles.countdownContainer}>
-          <View style={styles.countdownBadge}>
-            <ThemedText style={styles.countdownText}>
+          <View style={[
+            styles.countdownBadge,
+            {
+              backgroundColor: isDark ? "rgba(20,184,166,0.15)" : "rgba(20,184,166,0.1)",
+              borderColor: isDark ? "rgba(20,184,166,0.3)" : "rgba(20,184,166,0.2)",
+            }
+          ]}>
+            <ThemedText style={[styles.countdownText, { color: "#14B8A6" }]}>
               ⏰ {formatTime(timeRemaining)}
             </ThemedText>
           </View>
@@ -430,69 +477,84 @@ export function ChallengeCard({ selectedCategories }: ChallengeCardProps) {
           onPress={markAsDone}
           style={[
             styles.uploadButton,
-            isButtonDisabled && styles.uploadButtonDisabled,
+            blockedUntilNext && styles.uploadButtonCompleted,
+            isButtonDisabled && !blockedUntilNext && styles.uploadButtonDisabled,
           ]}
           disabled={isButtonDisabled}
         >
           {getButtonElement()}
         </Pressable>
       </Animated.View>
-    </ThemedView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    width: "85%",
-    maxWidth: 370,
-    backgroundColor: "transparent",
-    padding: 20,
+    width: "88%",
+    maxWidth: 400,
+    padding: 16,
     alignItems: "center",
     alignSelf: "center",
-    marginTop: 15,
+    marginTop: 0,
   },
   infoContainer: {
     width: "100%",
     alignItems: "flex-start",
-    marginTop: 15,
-    marginBottom: 20,
+    marginTop: 10,
+    marginBottom: 16,
   },
   badge: {
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 10,
-    marginBottom: 12,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    marginBottom: 14,
   },
-  badgeText: { fontSize: 12, fontWeight: "bold" },
-  challengeTitle: { fontSize: 16, fontWeight: "bold", textAlign: "left" },
+  badgeText: { fontSize: 12, fontWeight: "700" },
+  challengeTitle: {
+    fontSize: 17,
+    fontWeight: "700",
+    textAlign: "left",
+    lineHeight: 24,
+    letterSpacing: -0.2,
+  },
   countdownContainer: {
-    marginTop: 8,
+    marginTop: 10,
     width: "100%",
   },
   countdownBadge: {
-    backgroundColor: "#0055DA20",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: 10,
+    borderWidth: 1,
     alignSelf: "flex-start",
   },
   countdownText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#0055DA",
   },
   buttonContainer: { width: "100%", alignItems: "center" },
   uploadButton: {
-    backgroundColor: "#0055DA",
+    backgroundColor: "#FF6B6B",
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 16,
     width: "100%",
     alignItems: "center",
-    elevation: 4,
+    shadowColor: "#FF6B6B",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  uploadButtonCompleted: {
+    backgroundColor: "#14B8A6",
+    shadowColor: "#14B8A6",
+    shadowOpacity: 0.3,
   },
   uploadButtonDisabled: {
-    backgroundColor: "#b2bec3",
+    backgroundColor: "rgba(130,130,140,0.35)",
     shadowOpacity: 0,
     elevation: 0,
   },

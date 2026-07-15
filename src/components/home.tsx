@@ -1,51 +1,75 @@
 import { useEffect, useRef, useState, useCallback } from "react";
-import { StyleSheet, ScrollView, View, AppState } from "react-native";
+import { StyleSheet, AppState, View } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useFocusEffect } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import { supabase } from "../../supabaseClient";
 
-import { ThemedView } from "@/components/themed-view";
 import { ThemedText } from "@/components/themed-text";
 import { ChallengeCard } from "@/components/challenge-card";
 import { useAuth } from "@/providers/auth-provider";
 import { scheduleDailyChallengeNotifications } from "../../notifications";
+import { useTheme } from "@/hooks/use-theme";
+import { BottomTabInset, Spacing } from "@/constants/theme";
 
 const API_URL = "https://hobi-backend-yjzs.onrender.com";
-
 const SELECTED_HOBBIES_KEY = "@hobi-selected-hobbies";
+const NOTIF_THROTTLE_MS = 5 * 60 * 1000;
+
+const throttledScheduleNotifications = (lastRef: React.MutableRefObject<number>) => {
+  const now = Date.now();
+  if (now - lastRef.current >= NOTIF_THROTTLE_MS) {
+    lastRef.current = now;
+    scheduleDailyChallengeNotifications();
+  }
+};
+
+const getGreeting = (): string => {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Buenos dias";
+  if (hour < 18) return "Buenas tardes";
+  return "Buenas noches";
+};
 
 const Home = () => {
   const { session, signOut } = useAuth();
+  const theme = useTheme();
+  const safeAreaInsets = useSafeAreaInsets();
+  const isDark = theme.background === "#000000";
   const mountedRef = useRef(true);
   const [selectedHobbies, setSelectedHobbies] = useState<string[]>([]);
+  const [username, setUsername] = useState<string | null>(null);
+  const lastNotifRef = useRef(0);
 
   useEffect(() => {
     mountedRef.current = true;
-
-    if (!session) {
-      signOut();
-    }
-
-    return () => {
-      mountedRef.current = false;
-    };
+    if (!session) signOut();
+    return () => { mountedRef.current = false; };
   }, [session, signOut]);
 
   useEffect(() => {
-    if (session) {
-      scheduleDailyChallengeNotifications();
+    async function loadUser() {
+      const { data: { user } } = await supabase.auth.getUser();
+      setUsername(
+        user?.user_metadata?.displayName ||
+        user?.email?.split("@")[0] ||
+        null
+      );
     }
+    loadUser();
+  }, []);
+
+  useEffect(() => {
+    if (session) throttledScheduleNotifications(lastNotifRef);
   }, [session]);
 
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextAppState) => {
-      if (nextAppState === 'active') {
-        scheduleDailyChallengeNotifications();
-      }
+    const subscription = AppState.addEventListener("change", (nextAppState) => {
+      if (nextAppState === "active") throttledScheduleNotifications(lastNotifRef);
     });
-
-    return () => {
-      subscription.remove();
-    };
+    return () => subscription.remove();
   }, []);
 
   useFocusEffect(
@@ -76,58 +100,119 @@ const Home = () => {
               method: "POST",
               body: formData,
             });
-            if (response.ok) {
-              await AsyncStorage.removeItem("@hobi-pending-sync");
-            }
+            if (response.ok) await AsyncStorage.removeItem("@hobi-pending-sync");
           } catch {}
         }
       });
     }, [session])
   );
 
-  return (
-    <ThemedView style={styles.container} type="backgroundElement">
-      <ScrollView
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <ThemedView style={styles.textContainer} type="background">
-          <ThemedText style={styles.text} themeColor="textSecondary">
-            Hola, soy
-          </ThemedText>
-          <ThemedText style={styles.textTitle}>Hobi</ThemedText>
-        </ThemedView>
+  const gradientColors: [string, string, string] = isDark
+    ? ["#1a0a2e", "#16213e", "#000000"]
+    : ["#fff0f6", "#ffecd2", "#ffffff"];
 
+  return (
+    <View style={[
+      styles.container,
+      {
+        backgroundColor: theme.background,
+        paddingBottom: safeAreaInsets.bottom + BottomTabInset,
+      }
+    ]}>
+      {/* Header con gradiente */}
+      <LinearGradient
+        colors={gradientColors}
+        style={[styles.headerGradient, { paddingTop: safeAreaInsets.top + Spacing.two }]}
+      >
+        <View style={styles.headerRow}>
+          <View>
+            <ThemedText style={[styles.greeting, { color: theme.textSecondary }]}>
+              {getGreeting()}
+            </ThemedText>
+            <ThemedText style={styles.usernameText}>
+              {username ? username : "Hobi"}
+            </ThemedText>
+          </View>
+          <View style={[
+            styles.logoBubble,
+            {
+              backgroundColor: isDark ? "rgba(255,107,107,0.15)" : "rgba(255,107,107,0.1)",
+              borderColor: isDark ? "rgba(255,107,107,0.3)" : "rgba(255,107,107,0.2)",
+            }
+          ]}>
+            <Ionicons name="flame" size={22} color="#FF6B6B" />
+          </View>
+        </View>
+
+        <View style={[styles.subtitleRow, {
+          backgroundColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+          borderColor: isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.06)",
+        }]}>
+          <Ionicons name="sparkles" size={13} color="#FF9F43" />
+          <ThemedText style={[styles.subtitle, { color: theme.textSecondary }]}>
+            Tu reto de hoy te espera
+          </ThemedText>
+        </View>
+      </LinearGradient>
+
+      {/* Tarjeta del reto — ocupa todo el espacio restante */}
+      <View style={styles.cardWrapper}>
         <ChallengeCard selectedCategories={selectedHobbies} />
-      </ScrollView>
-    </ThemedView>
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
+  container: { flex: 1 },
+
+  headerGradient: {
+    paddingHorizontal: Spacing.three,
+    paddingBottom: Spacing.three,
   },
-  scrollContent: {
-    flexGrow: 1,
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: Spacing.two,
+  },
+  greeting: {
+    fontSize: 13,
+    fontWeight: "500",
+    marginBottom: 2,
+  },
+  usernameText: {
+    fontSize: 26,
+    fontWeight: "800",
+    letterSpacing: -0.5,
+  },
+  logoBubble: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingVertical: 32,
   },
-  textContainer: {
-    backgroundColor: "transparent",
-    flexDirection: "column",
+  subtitleRow: {
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 10,
-    width: "90%",
+    gap: 6,
+    alignSelf: "flex-start",
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
   },
-  text: {
-    fontSize: 16,
-    fontWeight: "bold",
+  subtitle: {
+    fontSize: 12,
+    fontWeight: "600",
   },
-  textTitle: {
-    fontSize: 28,
-    fontWeight: "bold",
+
+  cardWrapper: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
 
