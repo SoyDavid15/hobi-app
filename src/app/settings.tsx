@@ -9,11 +9,11 @@ import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme, triggerThemeChange } from '@/hooks/use-theme';
 import { supabase } from '../../supabaseClient';
+import { updateNotificationSchedule } from '../../notifications';
 
 const THEME_KEY = '@hobi-theme';
 const NOTIFICATIONS_KEY = '@hobi-notifications-enabled';
 const API_BASE = "https://hobi-backend-yjzs.onrender.com";
-import { updateNotificationSchedule } from '../../notifications';
 
 export default function SettingsScreen() {
   const router = useRouter();

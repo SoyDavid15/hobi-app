@@ -133,9 +133,9 @@ export function ChallengeCard({ selectedCategories }: ChallengeCardProps) {
     "idle" | "uploading" | "waking" | "success" | "error"
   >("idle");
   const [buttonScale] = useState(() => new Animated.Value(1));
+  const timeRemainingRef = useRef(0);
   const [timeRemaining, setTimeRemaining] = useState<number>(0);
   const [blockedUntilNext, setBlockedUntilNext] = useState<boolean>(false);
-  const [currentChallengeText, setCurrentChallengeText] = useState<string>("");
   const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const {
@@ -147,19 +147,9 @@ export function ChallengeCard({ selectedCategories }: ChallengeCardProps) {
   const { session } = useAuth();
   const theme = useTheme();
 
-  // Memorizar el texto del reto - solo actualizar cuando cambia el periodo
-  useEffect(() => {
-    if (dailyChallenge) {
-      const text = getNonEmptyChallenge(dailyChallenge, selectedCategories);
-      if (text !== "Cargando reto...") {
-        setCurrentChallengeText(text);
-      }
-    }
-  }, [dailyChallenge?.period, dailyChallenge?.categoria_fija]);
-
-  // Usar el estado memorizado
-  const challengeText = currentChallengeText || 
-    (backendLoading ? "Cargando reto..." : "No hay retos disponibles");
+  const challengeText = dailyChallenge
+    ? getNonEmptyChallenge(dailyChallenge, selectedCategories)
+    : (backendLoading ? "Cargando reto..." : "No hay retos disponibles");
   const isStillLoading =
     isLocalLoading ||
     backendLoading ||
@@ -193,34 +183,31 @@ export function ChallengeCard({ selectedCategories }: ChallengeCardProps) {
   }, [currentPeriod]);
 
   useEffect(() => {
-    if (countdownTimerRef.current) {
-      clearInterval(countdownTimerRef.current);
-      countdownTimerRef.current = null;
-    }
-
-    if (dailyChallenge?.time_remaining) {
+    if (dailyChallenge?.time_remaining !== undefined) {
+      timeRemainingRef.current = dailyChallenge.time_remaining;
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setTimeRemaining(dailyChallenge.time_remaining);
-
-      const timer = setInterval(() => {
-        setTimeRemaining((prev) => {
-          if (prev <= 1) {
-            clearInterval(timer);
-            countdownTimerRef.current = null;
-            refreshDailyChallenge();
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-
-      countdownTimerRef.current = timer;
     }
+  }, [dailyChallenge?.time_remaining]);
+
+  useEffect(() => {
+    if (!dailyChallenge?.time_remaining) return;
+
+    const timer = setInterval(() => {
+      timeRemainingRef.current -= 1;
+      if (timeRemainingRef.current <= 0) {
+        clearInterval(timer);
+        refreshDailyChallenge();
+        return;
+      }
+      setTimeRemaining(timeRemainingRef.current);
+    }, 1000);
+
+    countdownTimerRef.current = timer;
 
     return () => {
-      if (countdownTimerRef.current) {
-        clearInterval(countdownTimerRef.current);
-        countdownTimerRef.current = null;
-      }
+      clearInterval(timer);
+      countdownTimerRef.current = null;
     };
   }, [dailyChallenge?.time_remaining, refreshDailyChallenge]);
 

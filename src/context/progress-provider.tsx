@@ -150,6 +150,7 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     mountedRef.current = true;
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProgress();
     loadDailyChallenge();
 
@@ -166,7 +167,8 @@ export function ProgressProvider({ children }: { children: ReactNode }) {
         keepAliveRef.current = null;
       }
     };
-  }, [loadProgress, loadDailyChallenge]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <ProgressContext.Provider

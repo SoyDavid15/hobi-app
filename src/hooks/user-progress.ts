@@ -123,8 +123,10 @@ export function useUserPhotos() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPhotos();
-  }, [loadPhotos]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return {
     photos,

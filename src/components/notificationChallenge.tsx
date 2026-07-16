@@ -32,8 +32,6 @@ export const NotificationChallenge = () => {
   const [reto, setReto] = useState<string>("");
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<boolean>(false);
-  const [intento, setIntento] = useState<number>(0);
-
   const obtenerDato = async () => {
     setLoading(true);
     setError(false);
@@ -80,8 +78,9 @@ export const NotificationChallenge = () => {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     obtenerDato();
-  }, [intento]);
+  }, []);
 
   if (loading) {
     return (
@@ -102,7 +101,7 @@ export const NotificationChallenge = () => {
         </Text>
         <Pressable
           style={styles.retryButton}
-          onPress={() => setIntento((n) => n + 1)}
+          onPress={() => obtenerDato()}
         >
           <Text style={styles.retryText}>🔄 Reintentar</Text>
         </Pressable>

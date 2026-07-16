@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -7,7 +7,6 @@ import {
   ActivityIndicator,
   Modal,
   TouchableOpacity,
-  Dimensions,
   Animated,
 } from 'react-native';
 import { Image } from 'expo-image';
@@ -23,10 +22,8 @@ import { useUserProgress, useUserPhotos, UserPhoto } from '@/hooks/user-progress
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/hooks/use-theme';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const COLUMN_GAP = 10;
 const SIDE_PADDING = 16;
-const COL_WIDTH = (SCREEN_WIDTH - SIDE_PADDING * 2 - COLUMN_GAP) / 2;
 
 // Alturas variables para efecto masonry/Pinterest
 const PHOTO_HEIGHTS = [220, 160, 190, 240, 170, 200, 150, 230];
@@ -48,8 +45,8 @@ export default function ProfileScreen() {
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [username, setUsername] = useState<string | null>(null);
   const [selectedPhoto, setSelectedPhoto] = useState<(UserPhoto & { height: number }) | null>(null);
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const scaleAnim = useRef(new Animated.Value(0.92)).current;
+  const [fadeAnim] = useState(() => new Animated.Value(0));
+  const [scaleAnim] = useState(() => new Animated.Value(0.92));
 
   useEffect(() => {
     async function loadUser() {
@@ -70,7 +67,7 @@ export default function ProfileScreen() {
       fadeAnim.setValue(0);
       scaleAnim.setValue(0.92);
     }
-  }, [selectedPhoto]);
+  }, [selectedPhoto, fadeAnim, scaleAnim]);
 
   const insets = {
     ...safeAreaInsets,
@@ -337,7 +334,7 @@ interface PhotoTileProps {
 }
 
 function PhotoTile({ photo, height, onPress, cardBg, cardBorder, isDark }: PhotoTileProps) {
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const [scaleAnim] = useState(() => new Animated.Value(1));
 
   const onPressIn = () =>
     Animated.spring(scaleAnim, { toValue: 0.96, friction: 8, useNativeDriver: true }).start();

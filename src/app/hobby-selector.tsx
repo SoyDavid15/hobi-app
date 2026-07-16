@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   StyleSheet,
   View,
@@ -52,31 +52,23 @@ export default function HobbySelectorScreen() {
   const [saving, setSaving] = useState(false);
   const [backendError, setBackendError] = useState(false);
 
-  // Animation refs for staggered entrance
-  const fadeAnims = useRef<Animated.Value[]>([]);
-  const slideAnims = useRef<Animated.Value[]>([]);
-  const headerFade = useRef(new Animated.Value(0)).current;
-  const headerSlide = useRef(new Animated.Value(-20)).current;
+  const [fadeAnims, setFadeAnims] = useState<Animated.Value[]>([]);
+  const [slideAnims, setSlideAnims] = useState<Animated.Value[]>([]);
+  const [headerFadeAnim] = useState(() => new Animated.Value(0));
+  const [headerSlideAnim] = useState(() => new Animated.Value(-20));
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
-      // Load saved preferences (multi-select: stored as JSON array)
       const saved = await AsyncStorage.getItem(SELECTED_HOBBIES_KEY);
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
           if (Array.isArray(parsed)) setSelectedKeys(parsed);
         } catch {
-          // Migration: old single-value format
           setSelectedKeys([saved]);
         }
       }
 
-      // Fetch categories from backend
       const response = await fetch(`${API_URL}/categorias`);
       if (!response.ok) {
         throw new Error(`Backend error: ${response.status}`);
@@ -90,35 +82,34 @@ export default function HobbySelectorScreen() {
 
       setCategorias(categoriasList);
 
-      // Initialize animations
-      fadeAnims.current = categoriasList.map(() => new Animated.Value(0));
-      slideAnims.current = categoriasList.map(() => new Animated.Value(30));
+      const newFadeAnims = categoriasList.map(() => new Animated.Value(0));
+      const newSlideAnims = categoriasList.map(() => new Animated.Value(30));
+      setFadeAnims(newFadeAnims);
+      setSlideAnims(newSlideAnims);
 
       setLoading(false);
 
-      // Animate header
       Animated.parallel([
-        Animated.timing(headerFade, {
+        Animated.timing(headerFadeAnim, {
           toValue: 1,
           duration: 400,
           useNativeDriver: true,
         }),
-        Animated.timing(headerSlide, {
+        Animated.timing(headerSlideAnim, {
           toValue: 0,
           duration: 400,
           useNativeDriver: true,
         }),
       ]).start();
 
-      // Staggered card animations
       const animations = categoriasList.map((_: Categoria, i: number) =>
         Animated.parallel([
-          Animated.timing(fadeAnims.current[i], {
+          Animated.timing(newFadeAnims[i], {
             toValue: 1,
             duration: 350,
             useNativeDriver: true,
           }),
-          Animated.timing(slideAnims.current[i], {
+          Animated.timing(newSlideAnims[i], {
             toValue: 0,
             duration: 350,
             useNativeDriver: true,
@@ -132,7 +123,12 @@ export default function HobbySelectorScreen() {
       setBackendError(true);
       setLoading(false);
     }
-  };
+  }, [headerFadeAnim, headerSlideAnim]);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadData();
+  }, [loadData]);
 
   const toggleSelect = (key: string) => {
     setSelectedKeys((prev) => {
@@ -237,6 +233,13 @@ export default function HobbySelectorScreen() {
     );
   }
 
+  const animatedCategories = categorias.map((cat, i) => ({
+    cat,
+    isSelected: selectedKeys.includes(cat.key),
+    fadeAnim: fadeAnims[i] || new Animated.Value(1),
+    slideAnim: slideAnims[i] || new Animated.Value(0),
+  }));
+
   return (
     <ThemedView style={styles.container}>
       {/* Header */}
@@ -244,8 +247,8 @@ export default function HobbySelectorScreen() {
         style={[
           styles.header,
           {
-            opacity: headerFade,
-            transform: [{ translateY: headerSlide }],
+            opacity: headerFadeAnim,
+            transform: [{ translateY: headerSlideAnim }],
           },
         ]}
       >
@@ -271,76 +274,70 @@ export default function HobbySelectorScreen() {
         contentContainerStyle={styles.grid}
         showsVerticalScrollIndicator={false}
       >
-        {categorias.map((cat, index) => {
-          const isSelected = selectedKeys.includes(cat.key);
-          const fadeAnim = fadeAnims.current[index] || new Animated.Value(1);
-          const slideAnim = slideAnims.current[index] || new Animated.Value(0);
-
-          return (
-            <Animated.View
-              key={cat.key}
-              style={[
-                styles.cardWrapper,
+        {animatedCategories.map(({ cat, isSelected, fadeAnim, slideAnim }) => (
+          <Animated.View
+            key={cat.key}
+            style={[
+              styles.cardWrapper,
+              {
+                opacity: fadeAnim,
+                transform: [{ translateY: slideAnim }],
+              },
+            ]}
+          >
+            <Pressable
+              onPress={() => toggleSelect(cat.key)}
+              disabled={saving}
+              style={({ pressed }) => [
+                styles.card,
                 {
-                  opacity: fadeAnim,
-                  transform: [{ translateY: slideAnim }],
+                  backgroundColor: isSelected
+                    ? cat.color + "18"
+                    : theme.backgroundElement,
+                  borderColor: isSelected ? cat.color : "transparent",
+                  borderWidth: 2,
+                  transform: [{ scale: pressed ? 0.96 : 1 }],
                 },
               ]}
             >
-              <Pressable
-                onPress={() => toggleSelect(cat.key)}
-                disabled={saving}
-                style={({ pressed }) => [
-                  styles.card,
-                  {
-                    backgroundColor: isSelected
-                      ? cat.color + "18"
-                      : theme.backgroundElement,
-                    borderColor: isSelected ? cat.color : "transparent",
-                    borderWidth: 2,
-                    transform: [{ scale: pressed ? 0.96 : 1 }],
-                  },
+              {/* Icon Circle */}
+              <View
+                style={[
+                  styles.iconCircle,
+                  { backgroundColor: cat.color + "20" },
                 ]}
               >
-                {/* Icon Circle */}
+                <Ionicons
+                  name={getIconName(cat.icon)}
+                  size={28}
+                  color={cat.color}
+                />
+              </View>
+
+              {/* Label */}
+              <ThemedText
+                style={[
+                  styles.cardLabel,
+                  isSelected && { color: cat.color, fontWeight: "800" },
+                ]}
+              >
+                {cat.label}
+              </ThemedText>
+
+              {/* Selected checkmark */}
+              {isSelected && (
                 <View
                   style={[
-                    styles.iconCircle,
-                    { backgroundColor: cat.color + "20" },
+                    styles.checkBadge,
+                    { backgroundColor: cat.color },
                   ]}
                 >
-                  <Ionicons
-                    name={getIconName(cat.icon)}
-                    size={28}
-                    color={cat.color}
-                  />
+                  <Ionicons name="checkmark" size={14} color="#fff" />
                 </View>
-
-                {/* Label */}
-                <ThemedText
-                  style={[
-                    styles.cardLabel,
-                    isSelected && { color: cat.color, fontWeight: "800" },
-                  ]}
-                >
-                  {cat.label}
-                </ThemedText>
-
-                {/* Selected checkmark */}
-                {isSelected && (
-                  <View
-                    style={[
-                      styles.checkBadge,
-                      { backgroundColor: cat.color },
-                    ]}
-                  >
-                    <Ionicons name="checkmark" size={14} color="#fff" />
-                  </View>
-                )}
-              </Pressable>
-            </Animated.View>
-          );
-        })}
+              )}
+            </Pressable>
+          </Animated.View>
+        ))}
       </ScrollView>
 
       {/* Bottom confirm button */}
